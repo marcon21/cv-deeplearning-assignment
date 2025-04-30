@@ -1,9 +1,9 @@
-from model_template import ModelTemplate
+from models.model_base import ModelBase
 from torch.nn import functional as F
 from torch import nn
 
 
-class Model1(ModelTemplate):
+class Model1(ModelBase):
     def __init__(
         self,
         input_dim,
@@ -33,8 +33,3 @@ class Model1(ModelTemplate):
     def forward(self, x):
         x = self.network(x)
         return x
-
-
-if __name__ == "__main__":
-    model = Model1(input_dim=10, output_dim=1)
-    print(model)

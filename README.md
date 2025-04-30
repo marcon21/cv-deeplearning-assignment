@@ -8,4 +8,4 @@ The data loading is done in the file `data.py`.
 
 To train the model run `train.py`
 
-`eval.py` is still TODO
+`inference.py` is still TODO

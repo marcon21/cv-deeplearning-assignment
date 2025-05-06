@@ -1,36 +1,120 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
+import torchvision.transforms as transforms
+from torchvision.datasets import VOCDetection
+from torch.utils.data import Subset, DataLoader
+import xml.etree.ElementTree as ET
 
 
-# STILL FAKE DATA TODO
-def load_data(train=0.80, test=0.10, eval=0.10):
+def collate_fn(batch):
+    """Process batch data to have consistent dimensions and extract annotations."""
+    images = []
+    targets = []
+
+    for sample in batch:
+        img, annotation = sample
+        # Process the image
+        images.append(img)
+
+        # Process the annotation (XML to dictionary)
+        target = {}
+        anno = annotation["annotation"]
+        boxes = []
+        labels = []
+
+        for obj in anno.get("object", []):
+            bbox = obj["bndbox"]
+            xmin = float(bbox["xmin"])
+            ymin = float(bbox["ymin"])
+            xmax = float(bbox["xmax"])
+            ymax = float(bbox["ymax"])
+            boxes.append([xmin, ymin, xmax, ymax])
+            labels.append(obj["name"])
+
+        target["boxes"] = torch.tensor(boxes, dtype=torch.float32)
+        target["labels"] = labels
+        targets.append(target)
+
+    # return images, targets
+    return torch.stack(images), targets
+
+
+def load_data(
+    train=0.80,
+    test=0.10,
+    eval=0.10,
+    root_dir="./VOC",
+    batch_size=32,
+    num_workers=4,
+):
     # Ensure the ratios sum to 1
     if not np.isclose(train + test + eval, 1.0):
         raise ValueError("The sum of train, test, and eval ratios must be 1.0")
 
-    X = np.random.rand(1000, 10)  # 1000 samples, 10 features
-    y = np.random.randint(0, 2, size=(1000,))  # Binary classification labels
-
-    # Split into train and temp (test + eval)
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X, y, test_size=(1 - train), random_state=42
+    # Enhanced transforms with normalization
+    transform = transforms.Compose(
+        [
+            transforms.Resize((300, 300)),  # Consistent size
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ),  # ImageNet stats
+        ]
     )
 
-    # Calculate the proportion of test and eval in the temp set
-    test_ratio = test / (test + eval)
-
-    # Split temp into test and eval
-    X_test, X_eval, y_test, y_eval = train_test_split(
-        X_temp, y_temp, test_size=(1 - test_ratio), random_state=42
+    dataset = VOCDetection(
+        root=root_dir,
+        year="2012",
+        image_set="trainval",
+        download=True,
+        transform=transform,
     )
 
-    # Convert data to PyTorch tensors
-    X_train = torch.tensor(X_train, dtype=torch.float32)
-    y_train = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-    X_test = torch.tensor(X_test, dtype=torch.float32)
-    y_test = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)
-    X_eval = torch.tensor(X_eval, dtype=torch.float32)
-    y_eval = torch.tensor(y_eval, dtype=torch.float32).unsqueeze(1)
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    np.random.seed(42)
+    np.random.shuffle(indices)
 
-    return X_train, y_train, X_test, y_test, X_eval, y_eval
+    train_end = int(train * dataset_size)
+    test_end = train_end + int(test * dataset_size)
+
+    train_indices = indices[:train_end]
+    test_indices = indices[train_end:test_end]
+    eval_indices = indices[test_end:]
+
+    train_subset = Subset(dataset, train_indices)
+    test_subset = Subset(dataset, test_indices)
+    eval_subset = Subset(dataset, eval_indices)
+
+    train_loader = DataLoader(
+        train_subset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=collate_fn,  # Use custom collate function
+    )
+    test_loader = DataLoader(
+        test_subset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_fn,  # Use custom collate function
+    )
+    eval_loader = DataLoader(
+        eval_subset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_fn,  # Use custom collate function
+    )
+
+    return train_loader, test_loader, eval_loader
+
+
+if __name__ == "__main__":
+    # Example usage: iterate over the train dataloader
+    train_loader, test_loader, eval_loader = load_data()
+    for batch in train_loader:
+        print(f"Batch: {batch}")
+        break

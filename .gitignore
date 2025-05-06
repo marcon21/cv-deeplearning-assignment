@@ -9,7 +9,7 @@ VOC/
 
 # Wandb
 wandb/
-
+.vscode/
 model_saves/
 
 # Distribution / packaging

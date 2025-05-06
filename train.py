@@ -26,12 +26,30 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     np.random.seed(42)
 
-    X, y, X_test, y_test, X_eval, y_eval = data.load_data(
+    train_loader, test_loader, eval_loader = data.load_data(
         train=0.80, test=0.10, eval=0.10
     )
 
+    import matplotlib.pyplot as plt
+
+    # Get one batch from the train_loader
+    images, labels = next(iter(train_loader))
+
+    # Plot the first image in the batch
+    img = images[0].cpu().numpy()
+    if img.shape[0] == 1:
+        # Grayscale image
+        plt.imshow(img[0], cmap="gray")
+    else:
+        # Color image, transpose to (H, W, C)
+        plt.imshow(np.transpose(img, (1, 2, 0)))
+    plt.axis("off")
+    plt.show()
+
+    input("Press Enter to continue...")
+
     models = [
-        Model1(input_dim=10, output_dim=1, device=device),
+        Model1(input_dim=1, output_dim=10, device=device),
         # Model2(device=device),
         # Model3(device=device),
     ]
@@ -48,15 +66,11 @@ if __name__ == "__main__":
         model.to(device)
 
         model.train_model(
-            X=X,
-            y=y,
-            X_test=X_test,
-            y_test=y_test,
-            X_eval=X_eval,
-            y_eval=y_eval,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            eval_loader=eval_loader,
             optimizer=optimizer,
             loss_fn=loss_fn,
-            batch_size=batch_size,
             epochs=epochs,
         )
 

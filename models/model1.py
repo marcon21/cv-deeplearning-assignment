@@ -23,13 +23,20 @@ class Model1(ModelBase):
         super().__init__(file_path, device)
 
         self.network = nn.Sequential(
-            nn.Linear(input_dim, 64),
+            nn.Conv2d(
+                in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1
+            ),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Linear(32, output_dim),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Flatten(),
+            nn.Linear(32 * (input_dim // 4) * (input_dim // 4), 128),
+            nn.ReLU(),
+            nn.Linear(128, output_dim),
         )
 
-    def forward(self, x):
-        x = self.network(x)
-        return x
+        def forward(self, x):
+            x = self.network(x)
+            return x

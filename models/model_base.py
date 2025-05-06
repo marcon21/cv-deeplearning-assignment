@@ -98,70 +98,51 @@ class ModelBase(nn.Module):
 
     def train_model(
         self,
-        X: torch.Tensor,
-        y: torch.Tensor,
-        X_test: torch.Tensor = None,
-        y_test: torch.Tensor = None,
-        X_eval: torch.Tensor = None,
-        y_eval: torch.Tensor = None,
+        train_loader,  # DataLoader for training data
+        test_loader=None,
+        eval_loader=None,
         epochs: int = 1,
-        batch_size: int = 32,
         optimizer: torch.optim.Optimizer = None,
-        lr: float = 0.001,
         loss_fn: callable = None,
     ) -> None:
         """
-        Trains the model for a specified number of epochs using the provided data.
+        Trains the model for a specified number of epochs using the provided data loaders.
         Args:
-            X (torch.Tensor): Input data tensor.
-            y (torch.Tensor, optional): Target data tensor.
-            X_test (torch.Tensor, optional): Validation input data tensor. Defaults to None.
-            y_test (torch.Tensor, optional): Validation target data tensor. Defaults to None.
-            X_eval (torch.Tensor, optional): Evaluation input data tensor. Defaults to None.
-            y_eval (torch.Tensor, optional): Evaluation target data tensor. Defaults to None.
+            train_loader (DataLoader): DataLoader for training data.
+            test_loader (DataLoader, optional): DataLoader for validation data. Defaults to None.
+            eval_loader (DataLoader, optional): DataLoader for evaluation data. Defaults to None.
             epochs (int, optional): Number of training epochs. Defaults to 1.
-            batch_size (int, optional): Size of each training batch. Defaults to 32.
             optimizer (torch.optim.Optimizer, optional): Optimizer to use for training. If None, Adam optimizer is used. Defaults to None.
-            lr (float, optional): Learning rate for the optimizer. Defaults to 0.001.
             loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
         Returns:
             None
         """
 
         if optimizer is None:
-            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+            optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         if loss_fn is None:
             loss_fn = nn.MSELoss()
 
         self.train()
 
-        y = y.to(self.device)
-        X = X.to(self.device)
-        dataset = torch.utils.data.TensorDataset(X, y)
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=True
-        )
-
         for epoch in range(epochs):
-            self.train()
-            for batch_X, batch_y in dataloader:
+            epoch_loss = 0.0
+            for inputs, targets in train_loader:
+                inputs = inputs.to(self.device)
                 optimizer.zero_grad()
-                outputs = self(batch_X)
-                loss = loss_fn(outputs, batch_y)
+                outputs = self(inputs)
+                loss = loss_fn(outputs, targets)
                 loss.backward()
                 optimizer.step()
+                epoch_loss += loss.item()
 
-            self.train_history.append(loss.item())
-            # Replace TensorBoard logging with wandb
-            wandb.log({f"{self.model_name}/train_loss": loss.item(), "epoch": epoch})
+            avg_loss = epoch_loss / len(train_loader)
+            self.train_history.append(avg_loss)
+            wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
-            # Terminal output for training loss
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {loss.item():.4f}", end="")
-
-            if X_test is not None and y_test is not None:
-                val_loss, val_accuracy, f1 = self.evaluate_model(
-                    X_test, y_test, batch_size, loss_fn
-                )
+            if test_loader is not None:
+                val_loss, val_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
                 wandb.log(
                     {
                         f"{self.model_name}/val_loss": val_loss,
@@ -171,27 +152,21 @@ class ModelBase(nn.Module):
                     }
                 )
                 self.test_history.append(val_loss)
-                # Terminal output for validation
-                print(
-                    f" | Val Loss: {val_loss:.4f}",
-                )
+                print(f" | Val Loss: {val_loss:.4f}", end="")
 
-            print()  # Newline after each epoch
+            print()
 
-        if X_eval is not None and y_eval is not None:
-            eval_loss, eval_accuracy, f1 = self.evaluate_model(
-                X_eval, y_eval, batch_size, loss_fn
-            )
+        if eval_loader is not None:
+            eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)
             wandb.log(
                 {
                     f"{self.model_name}/eval_loss": eval_loss,
                     f"{self.model_name}/eval_accuracy": eval_accuracy,
                     f"{self.model_name}/eval_f1_score": f1,
-                    "epoch": epoch,
+                    "epoch": epochs - 1,
                 }
             )
             self.eval_history.append(eval_loss)
-            # Terminal output for evaluation
             print(
                 f"Eval Loss: {eval_loss:.4f}",
                 f" | Eval Accuracy: {eval_accuracy:.4f}",
@@ -202,18 +177,12 @@ class ModelBase(nn.Module):
         print("Training complete.")
 
     def evaluate_model(
-        self,
-        X: torch.Tensor,
-        y: torch.Tensor,
-        batch_size: int = 32,
-        loss_fn: callable = None,
+        self, data_loader, loss_fn: callable = None
     ) -> tuple[float, float, float]:
         """
-        Evaluates the model on the provided data.
+        Evaluates the model on the provided data loader.
         Args:
-            X (torch.Tensor): Input data tensor.
-            y (torch.Tensor, optional): Target data tensor. Defaults to None.
-            batch_size (int, optional): Size of each evaluation batch. Defaults to 32.
+            data_loader (DataLoader): DataLoader for evaluation data.
             loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
         Returns:
             float: The average loss over the evaluation dataset.
@@ -225,12 +194,6 @@ class ModelBase(nn.Module):
             loss_fn = nn.MSELoss()
 
         self.eval()
-        y = y.to(self.device)
-        X = X.to(self.device)
-        dataset = torch.utils.data.TensorDataset(X, y)
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=False
-        )
         total_loss = 0.0
         correct = 0
         total = 0
@@ -238,20 +201,20 @@ class ModelBase(nn.Module):
         all_labels = []
 
         with torch.no_grad():
-            for batch_X, batch_y in dataloader:
-                outputs = self(batch_X)
-                loss = loss_fn(outputs, batch_y)
+            for inputs, targets in data_loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self(inputs)
+                loss = loss_fn(outputs, targets)
                 total_loss += loss.item()
 
-                # Assuming binary classification for accuracy and F1 score
                 preds = torch.round(torch.sigmoid(outputs))
-                correct += (preds == batch_y).sum().item()
-                total += batch_y.size(0)
+                correct += (preds == targets).sum().item()
+                total += targets.size(0)
 
                 all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(batch_y.cpu().numpy())
+                all_labels.extend(targets.cpu().numpy())
 
-        accuracy = correct / total
-        f1 = f1_score(all_labels, all_preds, average="binary")
-        avg_loss = total_loss / len(dataloader)
+        accuracy = correct / total if total > 0 else 0
+        f1 = f1_score(all_labels, all_preds, average="binary") if total > 0 else 0
+        avg_loss = total_loss / len(data_loader)
         return avg_loss, accuracy, f1

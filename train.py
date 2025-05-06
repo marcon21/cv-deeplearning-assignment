@@ -5,6 +5,7 @@ import torch.optim as optim
 import torch.nn as nn
 
 from models.model1 import Model1
+from model_efficientnet import EfficientNetSegmentation
 
 # from models.model2 import Model2
 # from models.model3 import Model3

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from model_base import BaseModel  # Adjust path if needed
+from models.model_base import BaseModel 
 
 
 class EfficientNetSegmentation(BaseModel):

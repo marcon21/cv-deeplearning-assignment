@@ -47,6 +47,7 @@ def load_data(
     root_dir="./VOC",
     batch_size=32,
     num_workers=4,
+    grayscale=False,
 ):
     # Ensure the ratios sum to 1
     if not np.isclose(train + test + eval, 1.0):
@@ -60,6 +61,11 @@ def load_data(
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
             ),  # ImageNet stats
+            (
+                transforms.Grayscale(num_output_channels=1)
+                if grayscale
+                else transforms.Lambda(lambda x: x)
+            ),
         ]
     )
 

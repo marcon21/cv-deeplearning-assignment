@@ -11,6 +11,7 @@ class Model1(ModelBase):
         output_dim,
         file_path: str = "./model_saves/model1.pth",
         device=None,
+        use_wandb: bool = True,
     ):
         """
         Initializes the model with the specified input height, width, output dimensions, file path for saving the model,
@@ -21,8 +22,9 @@ class Model1(ModelBase):
             output_dim (int): The dimensionality of the output features.
             file_path (str, optional): The file path where the model will be saved. Defaults to "./model_saves/model1.pth".
             device (torch.device, optional): The device to be used for computation (e.g., 'cpu' or 'cuda'). Defaults to None.
+            use_wandb (bool, optional): Whether to use wandb for logging. Defaults to True.
         """
-        super().__init__(file_path, device)
+        super().__init__(file_path, device, use_wandb=use_wandb)
 
         flattened_size = 32 * (input_height // 4) * (input_width // 4)
 
@@ -38,7 +40,6 @@ class Model1(ModelBase):
             nn.Flatten(),
             nn.Linear(flattened_size, 128),
             nn.ReLU(),
-
             nn.Linear(128, output_dim),
         )
 

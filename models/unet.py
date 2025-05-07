@@ -10,6 +10,7 @@ class UNet(ModelBase):
         output_channels,  # Changed from output_dim
         file_path: str = "./model_saves/unet.pth",
         device=None,
+        use_wandb: bool = True,
     ):
         """
         Initializes the U-Net model.
@@ -18,8 +19,9 @@ class UNet(ModelBase):
             output_channels (int): Number of channels in the output segmentation map.
             file_path (str, optional): The file path where the model will be saved. Defaults to "./model_saves/unet.pth".
             device (torch.device, optional): The device to be used for computation. Defaults to None.
+            use_wandb (bool, optional): Whether to use wandb for logging. Defaults to True.
         """
-        super().__init__(file_path, device)
+        super().__init__(file_path, device, use_wandb=use_wandb)
 
         # Encoder (Downsampling path)
         self.enc_conv1 = self.double_conv(input_channels, 64)

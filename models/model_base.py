@@ -8,18 +8,25 @@ from tqdm import tqdm
 
 
 class ModelBase(nn.Module):
-    def __init__(self, file_path: str = None, device: Union[str, torch.device] = None):
+    def __init__(
+        self,
+        file_path: str = None,
+        device: Union[str, torch.device] = None,
+        use_wandb: bool = True,
+    ):
         """
         Initializes the model instance.
         Args:
             file_path (str, optional): Path to a file for loading or saving model data. Defaults to None.
             device (str or torch.device, optional): The device to run the model on ('cuda', 'mps', or 'cpu').
                 If not specified, automatically selects 'cuda' if available, otherwise 'mps', otherwise 'cpu'.
+            use_wandb (bool, optional): Whether to use wandb for logging. Defaults to True.
         Attributes:
             file_path (str or None): Stores the provided file path.
             train_history (list): Keeps track of training history.
             eval_history (list): Keeps track of evaluation history.
             device (str): The device selected for computation.
+            use_wandb (bool): Whether to use wandb for logging.
         """
 
         super().__init__()
@@ -27,6 +34,7 @@ class ModelBase(nn.Module):
         self.train_history = []
         self.eval_history = []
         self.test_history = []
+        self.use_wandb = use_wandb
 
         self.device = (
             device
@@ -42,14 +50,15 @@ class ModelBase(nn.Module):
 
         self.model_name = self.__class__.__name__
 
-        # Initialize wandb
-        wandb.init(
-            project="cv-deeplearning-assignment",
-            name=self.model_name,
-            config={
-                "model_name": self.model_name,
-            },
-        )
+        # Initialize wandb if enabled
+        if self.use_wandb:
+            wandb.init(
+                project="cv-deeplearning-assignment",
+                name=self.model_name,
+                config={
+                    "model_name": self.model_name,
+                },
+            )
 
     def save(self, file_path: str = None):
         """
@@ -149,19 +158,21 @@ class ModelBase(nn.Module):
 
             avg_loss = epoch_loss / len(train_loader)
             self.train_history.append(avg_loss)
-            wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
+            if self.use_wandb:
+                wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
             if test_loader is not None:
                 test_loss, test_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
-                wandb.log(
-                    {
-                        f"{self.model_name}/test_loss": test_loss,
-                        f"{self.model_name}/test_accuracy": test_accuracy,
-                        f"{self.model_name}/f1_score": f1,
-                        "epoch": epoch,
-                    }
-                )
+                if self.use_wandb:
+                    wandb.log(
+                        {
+                            f"{self.model_name}/test_loss": test_loss,
+                            f"{self.model_name}/test_accuracy": test_accuracy,
+                            f"{self.model_name}/f1_score": f1,
+                            "epoch": epoch,
+                        }
+                    )
                 self.test_history.append(test_loss)
                 print(f" | Test Loss: {test_loss:.4f}", end="")
 
@@ -169,14 +180,15 @@ class ModelBase(nn.Module):
 
         if eval_loader is not None:
             eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)
-            wandb.log(
-                {
-                    f"{self.model_name}/eval_loss": eval_loss,
-                    f"{self.model_name}/eval_accuracy": eval_accuracy,
-                    f"{self.model_name}/eval_f1_score": f1,
-                    "epoch": epochs - 1,
-                }
-            )
+            if self.use_wandb:
+                wandb.log(
+                    {
+                        f"{self.model_name}/eval_loss": eval_loss,
+                        f"{self.model_name}/eval_accuracy": eval_accuracy,
+                        f"{self.model_name}/eval_f1_score": f1,
+                        "epoch": epochs - 1,
+                    }
+                )
             self.eval_history.append(eval_loss)
             print(
                 f"Eval Loss: {eval_loss:.4f}",

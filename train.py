@@ -4,8 +4,9 @@ import data
 import torch.optim as optim
 import torch.nn as nn
 
-from models.model1 import Model1
+from models.unet import UNet
 
+# from models.model1 import Model1
 # from models.model2 import Model2
 # from models.model3 import Model3
 
@@ -21,48 +22,33 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
+    # device = ""
+
     print(f"Using device: {device}")
 
     torch.manual_seed(42)
     np.random.seed(42)
 
+    batch_size = 64
+    lr = 0.001
+    epochs = 10
+
     train_loader, test_loader, eval_loader = data.load_data(
-        train=0.80, test=0.10, eval=0.10
+        train=0.80, test=0.10, eval=0.10, batch_size=batch_size
     )
 
-    import matplotlib.pyplot as plt
-
-    # Get one batch from the train_loader
-    images, labels = next(iter(train_loader))
-
-    # Plot the first image in the batch
-    img = images[0].cpu().numpy()
-    if img.shape[0] == 1:
-        # Grayscale image
-        plt.imshow(img[0], cmap="gray")
-    else:
-        # Color image, transpose to (H, W, C)
-        plt.imshow(np.transpose(img, (1, 2, 0)))
-    plt.axis("off")
-    plt.show()
-
-    input("Press Enter to continue...")
-
     models = [
-        Model1(input_dim=1, output_dim=10, device=device),
+        UNet(input_channels=3, output_channels=21, device=device),
         # Model2(device=device),
         # Model3(device=device),
     ]
 
     for model in models:
         print(f"Training {model.model_name}...")
-        print(model)
+        # print(model)
 
-        lr = 0.001
-        batch_size = 32
-        epochs = 10
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        loss_fn = nn.MSELoss()
+        loss_fn = nn.CrossEntropyLoss()
         model.to(device)
 
         model.train_model(
@@ -74,6 +60,6 @@ if __name__ == "__main__":
             epochs=epochs,
         )
 
-        model.save()
+        # model.save()
 
     # model.plot_train_history()

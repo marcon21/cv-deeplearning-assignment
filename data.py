@@ -2,42 +2,27 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 import torchvision.transforms as transforms
-from torchvision.datasets import VOCDetection
+from torchvision.datasets import VOCSegmentation
 from torch.utils.data import Subset, DataLoader
-import xml.etree.ElementTree as ET
+import os
+
+
+# Define a top-level identity transform to avoid lambda pickling issues
+class IdentityTransform:
+    def __call__(self, x):
+        return x
 
 
 def collate_fn(batch):
-    """Process batch data to have consistent dimensions and extract annotations."""
     images = []
-    targets = []
-
-    for sample in batch:
-        img, annotation = sample
-        # Process the image
+    masks = []
+    for img, mask in batch:
         images.append(img)
-
-        # Process the annotation (XML to dictionary)
-        target = {}
-        anno = annotation["annotation"]
-        boxes = []
-        labels = []
-
-        for obj in anno.get("object", []):
-            bbox = obj["bndbox"]
-            xmin = float(bbox["xmin"])
-            ymin = float(bbox["ymin"])
-            xmax = float(bbox["xmax"])
-            ymax = float(bbox["ymax"])
-            boxes.append([xmin, ymin, xmax, ymax])
-            labels.append(obj["name"])
-
-        target["boxes"] = torch.tensor(boxes, dtype=torch.float32)
-        target["labels"] = labels
-        targets.append(target)
-
-    # return images, targets
-    return torch.stack(images), targets
+        # Remove channel dimension if present (should be [1, H, W])
+        if mask.ndim == 3 and mask.shape[0] == 1:
+            mask = mask.squeeze(0)
+        masks.append(mask)
+    return torch.stack(images), torch.stack(masks)
 
 
 def load_data(
@@ -56,7 +41,7 @@ def load_data(
     # Enhanced transforms with normalization
     transform = transforms.Compose(
         [
-            transforms.Resize((300, 300)),  # Consistent size
+            transforms.Resize((256, 256)),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -64,17 +49,31 @@ def load_data(
             (
                 transforms.Grayscale(num_output_channels=1)
                 if grayscale
-                else transforms.Lambda(lambda x: x)
+                else IdentityTransform()
             ),
         ]
     )
 
-    dataset = VOCDetection(
+    target_transform = transforms.Compose(
+        [
+            transforms.Resize(
+                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
+            ),
+            transforms.PILToTensor(),
+        ]
+    )
+
+    # Automatically set download flag based on presence of extracted data
+    voc_root = os.path.join(root_dir, "VOCdevkit", "VOC2012")
+    download = not os.path.exists(voc_root)
+
+    dataset = VOCSegmentation(
         root=root_dir,
         year="2012",
         image_set="trainval",
-        download=True,
+        download=download,
         transform=transform,
+        target_transform=target_transform,
     )
 
     dataset_size = len(dataset)
@@ -121,6 +120,6 @@ def load_data(
 if __name__ == "__main__":
     # Example usage: iterate over the train dataloader
     train_loader, test_loader, eval_loader = load_data()
-    for batch in train_loader:
-        print(f"Batch: {batch}")
+    for images, masks in train_loader:
+        print(f"Images shape: {images.shape}, Masks shape: {masks.shape}")
         break

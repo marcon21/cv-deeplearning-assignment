@@ -79,7 +79,9 @@ class ModelBase(nn.Module):
         if file_path is None:
             file_path = self.file_path
 
-        self.load_state_dict(torch.load(file_path))
+        # Ensure compatibility with device
+        state_dict = torch.load(file_path, map_location=self.device, weights_only=True)
+        self.load_state_dict(state_dict)
         self.eval()
 
     def plot_train_history(self):

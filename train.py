@@ -3,24 +3,51 @@ import torch
 import data
 import torch.optim as optim
 import torch.nn as nn
+import argparse
 
 from models.unet import UNet
+from models.model1 import Model1
 
-# from models.model1 import Model1
 # from models.model2 import Model2
 # from models.model3 import Model3
 
 if __name__ == "__main__":
     import os
 
+    parser = argparse.ArgumentParser(description="Train segmentation models.")
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs (default: 10)"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=16, help="Batch size (default: 16)"
+    )
+    parser.add_argument(
+        "--models",
+        type=str,
+        nargs="+",
+        default=[],
+        help="List of model class names to train (default: UNet)",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda", "mps"],
+        help="Device to use: auto, cpu, cuda, or mps (default: auto)",
+    )
+    args = parser.parse_args()
+
     os.environ["WANDB_SILENT"] = "true"
 
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif torch.backends.mps.is_available():
-        device = "mps"
+    if args.device == "auto":
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
     else:
-        device = "cpu"
+        device = args.device
 
     # device = "cpu"
 
@@ -29,19 +56,28 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     np.random.seed(42)
 
-    batch_size = 16
+    batch_size = args.batch_size
+    epochs = args.epochs
     lr = 0.001
-    epochs = 10
 
     train_loader, test_loader, eval_loader = data.load_data(
         train=0.80, test=0.10, eval=0.10, batch_size=batch_size
     )
 
-    models = [
-        UNet(input_channels=3, output_channels=21, device=device),
-        # Model2(device=device),
-        # Model3(device=device),
-    ]
+    # Map model class names to constructors and their required args
+    model_classes = {
+        "UNet": lambda: UNet(input_channels=3, output_channels=21, device=device),
+        "Model1": lambda: Model1(
+            input_height=256, input_width=256, output_dim=21, device=device
+        ),
+    }
+
+    models = []
+    for name in args.models:
+        if name in model_classes:
+            models.append(model_classes[name]())
+        else:
+            raise ValueError(f"Unknown model class: {name}")
 
     for model in models:
         print(f"Training {model.model_name}...")

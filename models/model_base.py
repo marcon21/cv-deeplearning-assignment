@@ -134,12 +134,14 @@ class ModelBase(nn.Module):
             ):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
+
                 optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = loss_fn(outputs, targets)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
+
             avg_loss = epoch_loss / len(train_loader)
             self.train_history.append(avg_loss)
             wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
@@ -188,6 +190,7 @@ class ModelBase(nn.Module):
         Args:
             data_loader (DataLoader): DataLoader for evaluation data.
             loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
+
         Returns:
             float: The average loss over the evaluation dataset.
             float: The accuracy of the model on the evaluation dataset.
@@ -220,5 +223,6 @@ class ModelBase(nn.Module):
 
         accuracy = correct / total if total > 0 else 0
         f1 = f1_score(all_labels, all_preds, average="macro") if total > 0 else 0
+
         avg_loss = total_loss / len(data_loader)
         return avg_loss, accuracy, f1

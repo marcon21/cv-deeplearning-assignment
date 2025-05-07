@@ -38,9 +38,10 @@ class Model1(ModelBase):
             nn.Flatten(),
             nn.Linear(flattened_size, 128),
             nn.ReLU(),
+
             nn.Linear(128, output_dim),
         )
 
-    def forward(self, x):
-        x = self.network(x)
-        return x
+        def forward(self, x):
+            x = self.network(x)
+            return x

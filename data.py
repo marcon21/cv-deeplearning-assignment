@@ -42,6 +42,7 @@ def load_data(
     transform = transforms.Compose(
         [
             transforms.Resize((256, 256)),
+
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -122,4 +123,5 @@ if __name__ == "__main__":
     train_loader, test_loader, eval_loader = load_data()
     for images, masks in train_loader:
         print(f"Images shape: {images.shape}, Masks shape: {masks.shape}")
+
         break

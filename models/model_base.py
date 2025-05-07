@@ -134,9 +134,9 @@ class ModelBase(nn.Module):
             ):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
-                # targets = (
-                #     targets.long()
-                # )  # Ensure targets are of type Long for CrossEntropyLoss
+                targets = (
+                    targets.long()
+                )  # Ensure targets are of type Long for CrossEntropyLoss
 
                 optimizer.zero_grad()
                 outputs = self(inputs)

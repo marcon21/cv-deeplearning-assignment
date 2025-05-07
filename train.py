@@ -60,6 +60,6 @@ if __name__ == "__main__":
             epochs=epochs,
         )
 
-        # model.save()
+        model.save()
 
     # model.plot_train_history()

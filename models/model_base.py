@@ -151,17 +151,17 @@ class ModelBase(nn.Module):
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
             if test_loader is not None:
-                val_loss, val_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
+                test_loss, test_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
                 wandb.log(
                     {
-                        f"{self.model_name}/val_loss": val_loss,
-                        f"{self.model_name}/val_accuracy": val_accuracy,
+                        f"{self.model_name}/test_loss": test_loss,
+                        f"{self.model_name}/test_accuracy": test_accuracy,
                         f"{self.model_name}/f1_score": f1,
                         "epoch": epoch,
                     }
                 )
-                self.test_history.append(val_loss)
-                print(f" | Val Loss: {val_loss:.4f}", end="")
+                self.test_history.append(test_loss)
+                print(f" | Test Loss: {test_loss:.4f}", end="")
 
             print()
 

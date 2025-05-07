@@ -22,39 +22,20 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
-    # device = ""
+    # device = "cpu"
 
     print(f"Using device: {device}")
 
     torch.manual_seed(42)
     np.random.seed(42)
 
-    batch_size = 64
+    batch_size = 16
     lr = 0.001
     epochs = 10
 
     train_loader, test_loader, eval_loader = data.load_data(
         train=0.80, test=0.10, eval=0.10, batch_size=batch_size
-
     )
-
-    import matplotlib.pyplot as plt
-
-    # Get one batch from the train_loader
-    images, labels = next(iter(train_loader))
-
-    # Plot the first image in the batch
-    img = images[0].cpu().numpy()
-    if img.shape[0] == 1:
-        # Grayscale image
-        plt.imshow(img[0], cmap="gray")
-    else:
-        # Color image, transpose to (H, W, C)
-        plt.imshow(np.transpose(img, (1, 2, 0)))
-    plt.axis("off")
-    plt.show()
-
-    input("Press Enter to continue...")
 
     models = [
         UNet(input_channels=3, output_channels=21, device=device),
@@ -67,7 +48,7 @@ if __name__ == "__main__":
         # print(model)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        loss_fn = nn.CrossEntropyLoss()
+        loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         model.to(device)
 
         model.train_model(

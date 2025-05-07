@@ -4,6 +4,7 @@ import torch
 from typing import Union
 from sklearn.metrics import f1_score
 import wandb
+from tqdm import tqdm
 
 
 class ModelBase(nn.Module):
@@ -113,7 +114,7 @@ class ModelBase(nn.Module):
             eval_loader (DataLoader, optional): DataLoader for evaluation data. Defaults to None.
             epochs (int, optional): Number of training epochs. Defaults to 1.
             optimizer (torch.optim.Optimizer, optional): Optimizer to use for training. If None, Adam optimizer is used. Defaults to None.
-            loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
+            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
         Returns:
             None
         """
@@ -121,14 +122,19 @@ class ModelBase(nn.Module):
         if optimizer is None:
             optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         if loss_fn is None:
-            loss_fn = nn.MSELoss()
+            loss_fn = nn.CrossEntropyLoss()
 
         self.train()
 
         for epoch in range(epochs):
             epoch_loss = 0.0
-            for inputs, targets in train_loader:
+
+            for inputs, targets in tqdm(
+                train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False
+            ):
                 inputs = inputs.to(self.device)
+                targets = targets.to(self.device)
+
                 optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = loss_fn(outputs, targets)
@@ -183,7 +189,8 @@ class ModelBase(nn.Module):
         Evaluates the model on the provided data loader.
         Args:
             data_loader (DataLoader): DataLoader for evaluation data.
-            loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
+            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
+
         Returns:
             float: The average loss over the evaluation dataset.
             float: The accuracy of the model on the evaluation dataset.
@@ -191,7 +198,7 @@ class ModelBase(nn.Module):
         """
 
         if loss_fn is None:
-            loss_fn = nn.MSELoss()
+            loss_fn = nn.CrossEntropyLoss()
 
         self.eval()
         total_loss = 0.0
@@ -207,14 +214,15 @@ class ModelBase(nn.Module):
                 loss = loss_fn(outputs, targets)
                 total_loss += loss.item()
 
-                preds = torch.round(torch.sigmoid(outputs))
+                preds = torch.argmax(outputs, dim=1)
                 correct += (preds == targets).sum().item()
-                total += targets.size(0)
+                total += targets.numel()
 
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(targets.cpu().numpy())
+                all_preds.extend(preds.cpu().numpy().flatten())
+                all_labels.extend(targets.cpu().numpy().flatten())
 
         accuracy = correct / total if total > 0 else 0
-        f1 = f1_score(all_labels, all_preds, average="binary") if total > 0 else 0
+        f1 = f1_score(all_labels, all_preds, average="macro") if total > 0 else 0
+
         avg_loss = total_loss / len(data_loader)
         return avg_loss, accuracy, f1

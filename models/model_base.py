@@ -213,6 +213,7 @@ class ModelBase(nn.Module):
         with torch.no_grad():
             for inputs, targets in data_loader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
+                targets = targets.long()
                 outputs = self(inputs)
                 loss = loss_fn(outputs, targets)
                 total_loss += loss.item()

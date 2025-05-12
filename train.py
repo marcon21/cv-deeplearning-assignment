@@ -7,7 +7,7 @@ import argparse
 
 from models.unet import UNet
 from models.model1 import Model1
-from models.swin import Model2, compute_loss_swin
+from models.swin import SwinTransformer, compute_loss_swin
 # from models.model3 import Model3
 
 if __name__ == "__main__":
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers",
         type=int,
-        default=[8],
+        default=[0],
         help="Number of workers for data loading (default: 4). If one value is provided, it will be used for all models."
     )
     parser.add_argument(
@@ -57,6 +57,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
+    os.environ["WANDB_MODE"] = "offline"
+
 
     if args.device == "auto":
         if torch.cuda.is_available():
@@ -89,9 +91,9 @@ if __name__ == "__main__":
         epochs_list = [int(epoch) for epoch in args.epochs]
 
 
-    # Set backbone for Model2 if needed
+    # Set backbone for Swin if needed
     backbone = None
-    if "Model2" in args.models:
+    if "Swin" in args.models:
         backbone_map = {
             "tiny": "microsoft/swin-tiny-patch4-window7-224",
             "base": "microsoft/swin-base-patch4-window7-224",
@@ -107,13 +109,13 @@ if __name__ == "__main__":
     model_classes = {
         "UNet": lambda: UNet(input_channels=3, output_channels=21, device=device),
         "Model1": lambda: Model1(input_height=256, input_width=256, output_dim=21, device=device),
-        "Model2": lambda: Model2(
+        "Swin": lambda: SwinTransformer(
             num_classes=21,
             decoder=None,
             model_name=backbone,
             device=device,
-            file_path=f"./model_saves/model2_{args.backbone}.pth",
-            use_wandb=False,
+            file_path=f"./model_saves/swin_transformer_{args.backbone}.pth",
+            use_wandb=True,
         ),
     }
 
@@ -148,7 +150,7 @@ if __name__ == "__main__":
         print(f"Training {model.model_name}...")
         optimizer = optim.Adam(model.parameters(), lr=lr)
         loss_fn = nn.CrossEntropyLoss(ignore_index=255)
-        if model.model_name == "Model2":
+        if model.model_name == "Swin":
             loss_fn = compute_loss_swin
         model.to(device)
         model.train_model(

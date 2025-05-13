@@ -9,7 +9,7 @@ import math
 
 def compute_loss_swin(pred, target):
     # Resize logits to match target size
-    pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False)
+    pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False).contiguous()
     loss = F.cross_entropy(pred, target)
     return loss
 
@@ -43,20 +43,15 @@ class SwinTransformer(ModelBase):
         )
         if decoder == "deeplab":
             self.decoder = DeepLabHead(in_channels=self.output_dim, num_classes=num_classes)
-            
 
-        
-        
     def forward(self, x):
         input_size = x.shape[-2:]
         x = self.backbone(pixel_values=x).last_hidden_state
         B, N, C = x.shape
         H = W = int(N ** 0.5)
-        x = x.permute(0, 2, 1).reshape(B, C, H, W)
+        x = x.permute(0, 2, 1).contiguous().view(B, C, H, W)
         x = self.decoder(x)
-        print(f"Decoder output shape: {x.shape}")
-        x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False).contiguous()
-        print(f"Final output shape: {x.shape}")
+        x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
         return x
     
     @staticmethod

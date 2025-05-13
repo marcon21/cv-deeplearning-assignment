@@ -2,14 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.vscode/
 # C extensions
 *.so
 VOC/
-
+out/
 # Wandb
 wandb/
-
+.vscode/
 model_saves/
 
 # Distribution / packaging

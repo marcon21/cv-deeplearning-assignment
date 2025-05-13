@@ -4,21 +4,29 @@ import torch
 from typing import Union
 from sklearn.metrics import f1_score
 import wandb
+from tqdm import tqdm
 
 
 class ModelBase(nn.Module):
-    def __init__(self, file_path: str = None, device: Union[str, torch.device] = None):
+    def __init__(
+        self,
+        file_path: str = None,
+        device: Union[str, torch.device] = None,
+        use_wandb: bool = True,
+    ):
         """
         Initializes the model instance.
         Args:
             file_path (str, optional): Path to a file for loading or saving model data. Defaults to None.
             device (str or torch.device, optional): The device to run the model on ('cuda', 'mps', or 'cpu').
                 If not specified, automatically selects 'cuda' if available, otherwise 'mps', otherwise 'cpu'.
+            use_wandb (bool, optional): Whether to use wandb for logging. Defaults to True.
         Attributes:
             file_path (str or None): Stores the provided file path.
             train_history (list): Keeps track of training history.
             eval_history (list): Keeps track of evaluation history.
             device (str): The device selected for computation.
+            use_wandb (bool): Whether to use wandb for logging.
         """
 
         super().__init__()
@@ -26,6 +34,7 @@ class ModelBase(nn.Module):
         self.train_history = []
         self.eval_history = []
         self.test_history = []
+        self.use_wandb = use_wandb
 
         self.device = (
             device
@@ -41,14 +50,15 @@ class ModelBase(nn.Module):
 
         self.model_name = self.__class__.__name__
 
-        # Initialize wandb
-        wandb.init(
-            project="cv-deeplearning-assignment",
-            name=self.model_name,
-            config={
-                "model_name": self.model_name,
-            },
-        )
+        # Initialize wandb if enabled
+        if self.use_wandb:
+            wandb.init(
+                project="cv-deeplearning-assignment",
+                name=self.model_name,
+                config={
+                    "model_name": self.model_name,
+                },
+            )
 
     def save(self, file_path: str = None):
         """
@@ -78,7 +88,9 @@ class ModelBase(nn.Module):
         if file_path is None:
             file_path = self.file_path
 
-        self.load_state_dict(torch.load(file_path))
+        # Ensure compatibility with device
+        state_dict = torch.load(file_path, map_location=self.device, weights_only=True)
+        self.load_state_dict(state_dict)
         self.eval()
 
     def plot_train_history(self):
@@ -113,7 +125,7 @@ class ModelBase(nn.Module):
             eval_loader (DataLoader, optional): DataLoader for evaluation data. Defaults to None.
             epochs (int, optional): Number of training epochs. Defaults to 1.
             optimizer (torch.optim.Optimizer, optional): Optimizer to use for training. If None, Adam optimizer is used. Defaults to None.
-            loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
+            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
         Returns:
             None
         """
@@ -121,14 +133,22 @@ class ModelBase(nn.Module):
         if optimizer is None:
             optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         if loss_fn is None:
-            loss_fn = nn.MSELoss()
+            loss_fn = nn.CrossEntropyLoss()
 
         self.train()
 
         for epoch in range(epochs):
             epoch_loss = 0.0
-            for inputs, targets in train_loader:
+
+            for inputs, targets in tqdm(
+                train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False
+            ):
                 inputs = inputs.to(self.device)
+                targets = targets.to(self.device)
+                targets = (
+                    targets.long()
+                )  # Ensure targets are of type Long for CrossEntropyLoss
+
                 optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = loss_fn(outputs, targets)
@@ -138,34 +158,37 @@ class ModelBase(nn.Module):
 
             avg_loss = epoch_loss / len(train_loader)
             self.train_history.append(avg_loss)
-            wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
+            if self.use_wandb:
+                wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
             if test_loader is not None:
-                val_loss, val_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
-                wandb.log(
-                    {
-                        f"{self.model_name}/val_loss": val_loss,
-                        f"{self.model_name}/val_accuracy": val_accuracy,
-                        f"{self.model_name}/f1_score": f1,
-                        "epoch": epoch,
-                    }
-                )
-                self.test_history.append(val_loss)
-                print(f" | Val Loss: {val_loss:.4f}", end="")
+                test_loss, test_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
+                if self.use_wandb:
+                    wandb.log(
+                        {
+                            f"{self.model_name}/test_loss": test_loss,
+                            f"{self.model_name}/test_accuracy": test_accuracy,
+                            f"{self.model_name}/f1_score": f1,
+                            "epoch": epoch,
+                        }
+                    )
+                self.test_history.append(test_loss)
+                print(f" | Test Loss: {test_loss:.4f}", end="")
 
             print()
 
         if eval_loader is not None:
             eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)
-            wandb.log(
-                {
-                    f"{self.model_name}/eval_loss": eval_loss,
-                    f"{self.model_name}/eval_accuracy": eval_accuracy,
-                    f"{self.model_name}/eval_f1_score": f1,
-                    "epoch": epochs - 1,
-                }
-            )
+            if self.use_wandb:
+                wandb.log(
+                    {
+                        f"{self.model_name}/eval_loss": eval_loss,
+                        f"{self.model_name}/eval_accuracy": eval_accuracy,
+                        f"{self.model_name}/eval_f1_score": f1,
+                        "epoch": epochs - 1,
+                    }
+                )
             self.eval_history.append(eval_loss)
             print(
                 f"Eval Loss: {eval_loss:.4f}",
@@ -183,7 +206,8 @@ class ModelBase(nn.Module):
         Evaluates the model on the provided data loader.
         Args:
             data_loader (DataLoader): DataLoader for evaluation data.
-            loss_fn (callable, optional): Loss function to use. If None, MSELoss is used. Defaults to None.
+            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
+
         Returns:
             float: The average loss over the evaluation dataset.
             float: The accuracy of the model on the evaluation dataset.
@@ -191,7 +215,7 @@ class ModelBase(nn.Module):
         """
 
         if loss_fn is None:
-            loss_fn = nn.MSELoss()
+            loss_fn = nn.CrossEntropyLoss()
 
         self.eval()
         total_loss = 0.0
@@ -203,18 +227,20 @@ class ModelBase(nn.Module):
         with torch.no_grad():
             for inputs, targets in data_loader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
+                targets = targets.long()
                 outputs = self(inputs)
                 loss = loss_fn(outputs, targets)
                 total_loss += loss.item()
 
-                preds = torch.round(torch.sigmoid(outputs))
+                preds = torch.argmax(outputs, dim=1)
                 correct += (preds == targets).sum().item()
-                total += targets.size(0)
+                total += targets.numel()
 
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(targets.cpu().numpy())
+                all_preds.extend(preds.cpu().numpy().flatten())
+                all_labels.extend(targets.cpu().numpy().flatten())
 
         accuracy = correct / total if total > 0 else 0
-        f1 = f1_score(all_labels, all_preds, average="binary") if total > 0 else 0
+        f1 = f1_score(all_labels, all_preds, average="macro") if total > 0 else 0
+
         avg_loss = total_loss / len(data_loader)
         return avg_loss, accuracy, f1

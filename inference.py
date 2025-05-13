@@ -9,20 +9,14 @@ import importlib
 
 
 def get_model_class(class_name):
-    print("Available models: UNet, EfficientNet, Model2")
     if class_name == "UNet":
         from models.unet import UNet
-
         return UNet
-    
     elif class_name == "EfficientNet":
         from models.EfficientNet import EfficientNet
-
         return EfficientNet
-
     elif class_name == "Model2":
         from models.swin import Model2
-
         return Model2
     else:
         raise ValueError(f"Unknown model class: {class_name}")
@@ -218,6 +212,15 @@ def main():
             device=device,
             use_wandb=False,
         )
+
+    elif args.model_class == "EfficientNet":
+    model = ModelClass(
+        num_classes=21,
+        file_path=args.model_path,
+        device=device,
+        use_wandb=False,
+    )
+    
     else:
         raise ValueError("Unknown model class")
     model.load(args.model_path)

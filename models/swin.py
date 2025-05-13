@@ -3,6 +3,23 @@ import torch
 import torch.nn.functional as F
 from transformers import SwinModel
 from .model_base import ModelBase
+from torch.optim.lr_scheduler import LambdaLR
+import math
+
+def compute_loss_swin(pred, target):
+    # Resize logits to match target size
+    pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False)
+    loss = F.cross_entropy(pred, target)
+    return loss
+
+def _lr_lambda(current_step, warmup_steps, total_steps):
+    if current_step < warmup_steps:
+        return float(current_step) / float(max(1, warmup_steps))
+    progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+    return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+def get_scheduler(optimizer):
+    LambdaLR(optimizer, _lr_lambda)
 
 class SwinTransformer(ModelBase):
     def __init__(self,
@@ -55,9 +72,9 @@ class SwinTransformer(ModelBase):
             return 0.0  # if no valid classes were present
         return sum(ious) / len(ious)
     
-def compute_loss_swin(pred, target):
-    # Resize logits to match target size
-    pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False)
-    loss = F.cross_entropy(pred, target)
-    return loss
+
+
+
+    
+
 

@@ -4,11 +4,11 @@ import data
 import torch.optim as optim
 import torch.nn as nn
 import argparse
-from transformers import get_cosine_schedule_with_warmup
+import wandb
 
 from models.unet import UNet
 from models.model1 import Model1
-from models.swin import SwinTransformer, compute_loss_swin
+from models.swin import SwinTransformer, compute_loss_swin, get_scheduler
 # from models.model3 import Model3
 
 if __name__ == "__main__":
@@ -50,14 +50,16 @@ if __name__ == "__main__":
         help="Number of workers for data loading (default: 4). If one value is provided, it will be used for all models."
     )
     parser.add_argument(
-        "--learning_rate",
+        "--learning_rates",
         type=float,
-        default=[0.0005],
+        nargs="+",
+        default=[[6e-5, 6e-4]],
         help="Learning rate for the optimizer (default: 0.0001). If one value is provided, it will be used for all models."
     )
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
+    wandb.login(key="37e239489699d8046f56667f6f8f20159211af5e")
 
 
     if args.device == "auto":
@@ -130,8 +132,7 @@ if __name__ == "__main__":
             "epochs": epochs
         })
 
-    # Set learning rate from the command-line arguments
-    lr = args.learning_rate[0]
+    lr = 0.0001
     
     # Execute training for each run
     for run_params in runs:
@@ -150,25 +151,25 @@ if __name__ == "__main__":
         print(f"Training {model.model_name}...")
         if model.model_name == "Swin":
             if args.backbone == "tiny":
+                lr1 = arguments.learning_rates[0][0]
+                lr2 = arguments.learning_rates[0][1]
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": 5e-5},
-                        {"params": model.decoder.parameters(), "lr": lr},
+                        {"params": model.backbone.parameters(), "lr": lr1},
+                        {"params": model.decoder.parameters(), "lr": lr2},
                     ], weight_decay=0.01)
             elif args.backbone == "base":
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": 1e-5},
-                        {"params": model.decoder.parameters(), "lr": lr},
+                        {"params": model.backbone.parameters(), "lr": lr1},
+                        {"params": model.decoder.parameters(), "lr": lr2},
                     ], weight_decay=0.01)
             elif args.backbone == "small":
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": 1e-5},
-                        {"params": model.decoder.parameters(), "lr": lr},
+                        {"params": model.backbone.parameters(), "lr": lr1},
+                        {"params": model.decoder.parameters(), "lr": lr2},
                     ], weight_decay=0.01)
-            scheduler = get_cosine_schedule_with_warmup(
-                optimizer,
-                num_warmup_steps=int(0.1 * len(train_loader) * run_params["epochs"]),
-                num_training_steps=epochs * len(train_loader),
-            )
+            scheduler = get_scheduler(optimizer)
+            print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
+            
 
         else:
             optimizer = optim.Adam(model.parameters(), lr=lr)

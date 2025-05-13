@@ -6,7 +6,6 @@ from typing import Union
 from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
-from transformers import get_cosine_schedule_with_warmup
 
 
 

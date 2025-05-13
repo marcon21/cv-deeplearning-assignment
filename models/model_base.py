@@ -201,7 +201,7 @@ class ModelBase(nn.Module):
         self.eval()
         print("Training complete.")
 
-    def _compute_miou(pred, target, num_classes=21):
+    def _compute_miou(self, pred, target, num_classes=21):
         pred = pred.view(-1)
         target = target.view(-1)
         intersection = torch.zeros(num_classes).to(pred.device)

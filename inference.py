@@ -13,11 +13,16 @@ def get_model_class(class_name):
         from models.unet import UNet
 
         return UNet
-    elif class_name == "Model1":
-        from models.model1 import Model1
+    
+    elif class_name == "EfficientNet":
+        from models.EfficientNet import EfficientNet
 
-        return Model1
-    # Add more models as needed
+        return EfficientNet
+
+    elif class_name == "Model2":
+        from models.swin import Model2
+
+        return Model2
     else:
         raise ValueError(f"Unknown model class: {class_name}")
 
@@ -127,6 +132,37 @@ def concat_and_save_images(input_path, gt_path, pred_path, out_path):
         x_offset += img.width
     new_img.save(out_path)
 
+def save_overlapped_images(input_path, gt_path, pred_path, out_path):
+    input_img = Image.open(input_path).convert("RGBA")
+    gt_img = Image.open(gt_path).convert("L")
+    pred_img = Image.open(pred_path).convert("L")
+
+    overlapped_img = input_img.copy()
+    pixels = overlapped_img.load()
+    input_pixels = input_img.load()
+    alpha_gt = 0.5  
+    alpha_pred = 0.5  
+
+    def blend(background, overlay, alpha):
+        return tuple(
+            int(alpha * overlay[i] + (1 - alpha) * background[i]) for i in range(3)
+        ) + (255,)
+
+    for x in range(input_img.width):
+        for y in range(input_img.height):
+            bg_pixel = input_pixels[x, y]
+            gt_val = gt_img.getpixel((x, y))
+            pred_val = pred_img.getpixel((x, y))
+            if gt_val != 0:  # ground truth: red overlay
+                pixels[x, y] = blend(bg_pixel, (255, 0, 0), alpha_gt)
+            elif pred_val != 0:  # prediction: green overlay
+                pixels[x, y] = blend(bg_pixel, (0, 255, 0), alpha_pred)
+            else:
+                pixels[x, y] = bg_pixel
+
+    overlapped_img = overlapped_img.convert("RGB")
+    overlapped_img.save(out_path)
+
 
 def main():
     import argparse
@@ -170,6 +206,16 @@ def main():
             device=device,
             use_wandb=False,
         )
+    elif args.model_class == "Model2":
+        # Example: Model2(num_classes, decoder, model_name, ...)
+        model = ModelClass(
+            num_classes=21,
+            decoder=None,
+            model_name="microsoft/swin-tiny-patch4-window7-224",
+            file_path=args.model_path,
+            device=device,
+            use_wandb=False,
+        )
     else:
         raise ValueError("Unknown model class")
     model.load(args.model_path)
@@ -200,6 +246,9 @@ def main():
         concat_path = os.path.join(out_dir, f"{count}_concat.png")
         concat_and_save_images(input_path, gt_path, pred_path, concat_path)
         count += 1
+        # Save overlapped image
+        overlapped_path = os.path.join(out_dir, f"{count}_overlapped.png")
+        save_overlapped_images(input_path, gt_path, pred_path, overlapped_path)
     print(f"Saved {count} examples to {out_dir}")
 
 

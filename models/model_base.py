@@ -163,7 +163,7 @@ class ModelBase(nn.Module):
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
             if test_loader is not None:
-                test_loss, test_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
+                test_loss, test_accuracy, f1, miou = self.evaluate_model(test_loader, loss_fn)
                 if self.use_wandb:
                     wandb.log(
                         {
@@ -179,13 +179,14 @@ class ModelBase(nn.Module):
             print()
 
         if eval_loader is not None:
-            eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)
+            eval_loss, eval_accuracy, f1, miou = self.evaluate_model(eval_loader, loss_fn)
             if self.use_wandb:
                 wandb.log(
                     {
                         f"{self.model_name}/eval_loss": eval_loss,
                         f"{self.model_name}/eval_accuracy": eval_accuracy,
                         f"{self.model_name}/eval_f1_score": f1,
+                        f"{self.model_name}/eval_miou": miou,
                         "epoch": epochs - 1,
                     }
                 )
@@ -194,10 +195,24 @@ class ModelBase(nn.Module):
                 f"Eval Loss: {eval_loss:.4f}",
                 f" | Eval Accuracy: {eval_accuracy:.4f}",
                 f" | Eval F1 Score: {f1:.4f}",
+                f" | Eval mIoU: {miou:.4f}",
             )
 
         self.eval()
         print("Training complete.")
+
+    def _compute_miou(pred, target, num_classes=21):
+        pred = pred.view(-1)
+        target = target.view(-1)
+        intersection = torch.zeros(num_classes).to(pred.device)
+        union = torch.zeros(num_classes).to(pred.device)
+
+        for i in range(num_classes):
+            intersection[i] = ((pred == i) & (target == i)).sum()
+            union[i] = ((pred == i) | (target == i)).sum()
+
+        miou = (intersection / (union + 1e-6)).mean().item()
+        return miou
 
     def evaluate_model(
         self, data_loader, loss_fn: callable = None
@@ -212,6 +227,7 @@ class ModelBase(nn.Module):
             float: The average loss over the evaluation dataset.
             float: The accuracy of the model on the evaluation dataset.
             float: The F1 score of the model on the evaluation dataset.
+            float : The mean Intersection over Union (mIoU) of the model on the evaluation dataset.
         """
 
         if loss_fn is None:
@@ -223,6 +239,7 @@ class ModelBase(nn.Module):
         total = 0
         all_preds = []
         all_labels = []
+        all_miou = []
 
         with torch.no_grad():
             for inputs, targets in data_loader:
@@ -239,8 +256,12 @@ class ModelBase(nn.Module):
                 all_preds.extend(preds.cpu().numpy().flatten())
                 all_labels.extend(targets.cpu().numpy().flatten())
 
+                miou = self._compute_miou(preds, targets)
+                all_miou.append(miou)
+
         accuracy = correct / total if total > 0 else 0
         f1 = f1_score(all_labels, all_preds, average="macro") if total > 0 else 0
+        miou = sum(all_miou) / len(all_miou) if all_miou else 0
 
         avg_loss = total_loss / len(data_loader)
-        return avg_loss, accuracy, f1
+        return avg_loss, accuracy, f1, miou

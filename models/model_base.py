@@ -6,6 +6,8 @@ from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
 import os
+import numpy as np
+from torch.utils.data import Subset, DataLoader
 
 
 class DiceLoss(nn.Module):
@@ -145,6 +147,24 @@ class ModelBase(nn.Module):
         plt.legend()
         plt.show()
 
+    def get_subset_loader(self, data_loader, subset_size):
+        """
+        Returns a DataLoader for a random subset of the given data_loader's dataset.
+        """
+        dataset = data_loader.dataset
+        total_size = len(dataset)
+        indices = np.random.choice(
+            total_size, min(subset_size, total_size), replace=False
+        )
+        # Try to preserve collate_fn and num_workers if available
+        return DataLoader(
+            Subset(dataset, indices),
+            batch_size=data_loader.batch_size,
+            shuffle=False,
+            num_workers=getattr(data_loader, "num_workers", 0),
+            collate_fn=getattr(data_loader, "collate_fn", None),
+        )
+
     def train_model(
         self,
         train_loader,  # DataLoader for training data
@@ -199,19 +219,33 @@ class ModelBase(nn.Module):
                 wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
+            # Validation logic: subset every epoch, full every 5 epochs
+            subset_size = 100  # You can adjust this value
+            validate_every = 5
             if test_loader is not None:
-                test_loss, test_accuracy, f1 = self.evaluate_model(test_loader, loss_fn)
-                if self.use_wandb:
-                    wandb.log(
-                        {
-                            f"{self.model_name}/test_loss": test_loss,
-                            f"{self.model_name}/test_accuracy": test_accuracy,
-                            f"{self.model_name}/f1_score": f1,
-                            "epoch": epoch,
-                        }
+                if (epoch + 1) % validate_every == 0 or epoch == epochs - 1:
+                    # Full validation
+                    test_loss, test_accuracy, f1 = self.evaluate_model(
+                        test_loader, loss_fn
                     )
-                self.test_history.append(test_loss)
-                print(f" | Test Loss: {test_loss:.4f}", end="")
+                    if self.use_wandb:
+                        wandb.log(
+                            {
+                                f"{self.model_name}/test_loss": test_loss,
+                                f"{self.model_name}/test_accuracy": test_accuracy,
+                                f"{self.model_name}/f1_score": f1,
+                                "epoch": epoch,
+                            }
+                        )
+                    self.test_history.append(test_loss)
+                    print(f" | Full Test Loss: {test_loss:.4f}", end="")
+                else:
+                    # Subset validation
+                    subset_loader = self.get_subset_loader(test_loader, subset_size)
+                    test_loss, test_accuracy, f1 = self.evaluate_model(
+                        subset_loader, loss_fn
+                    )
+                    print(f" | Subset Test Loss: {test_loss:.4f}", end="")
 
             print()
 

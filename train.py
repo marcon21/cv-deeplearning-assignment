@@ -36,6 +36,13 @@ if __name__ == "__main__":
         choices=["auto", "cpu", "cuda", "mps"],
         help="Device to use: auto, cpu, cuda, or mps (default: auto)",
     )
+    parser.add_argument(
+        "--load_weights",
+        type=str,
+        nargs="*",
+        default=None,
+        help="List of paths to model weights to load before training (in order of models).",
+    )
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
@@ -79,6 +86,15 @@ if __name__ == "__main__":
             models.append(model_classes[name]())
         else:
             raise ValueError(f"Unknown model class: {name}")
+
+    # Load weights if provided
+    if args.load_weights is not None:
+        if len(args.load_weights) > len(models):
+            raise ValueError("More weight paths provided than models.")
+        for i, weight_path in enumerate(args.load_weights):
+            if weight_path and weight_path.lower() != "none":
+                print(f"Loading weights for {models[i].model_name} from {weight_path}")
+                models[i].load(weight_path)
 
     for model in models:
         print(f"Training {model.model_name}...")

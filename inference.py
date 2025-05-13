@@ -9,6 +9,7 @@ import importlib
 
 
 def get_model_class(class_name):
+    print("Available models: UNet, EfficientNet, Model2")
     if class_name == "UNet":
         from models.unet import UNet
 
@@ -192,6 +193,7 @@ def main():
     _, test_loader, _ = data.load_data(batch_size=1)
 
     # Dynamically get model class
+    print(f"Calling get_model_class({args.model_class})")
     ModelClass = get_model_class(args.model_class)
     if args.model_class == "UNet":
         model = ModelClass(

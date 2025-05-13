@@ -47,7 +47,7 @@ if __name__ == "__main__":
         "--workers",
         type=int,
         nargs="+",
-        default=[0],
+        default=0,
         help="Number of workers for data loading (default: 4). If one value is provided, it will be used for all models."
     )
     parser.add_argument(

@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
-from models.model_base import BaseModel
+from models.model_base import ModelBase
 
 
-class EfficientNet(BaseModel):
+class EfficientNet(ModelBase):
     def __init__(self, num_classes=21, file_path: str = "./model_saves/efficientnet.pth", device=None):
         super().__init__(file_path=file_path, device=device)
         self.num_classes = num_classes

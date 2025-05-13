@@ -46,7 +46,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers",
         type=int,
-        nargs="+",
         default=0,
         help="Number of workers for data loading (default: 4). If one value is provided, it will be used for all models."
     )
@@ -60,7 +59,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
-    wandb.login(key="37e239489699d8046f56667f6f8f20159211af5e")
 
 
     if args.device == "auto":
@@ -152,8 +150,8 @@ if __name__ == "__main__":
         print(f"Training {model.model_name}...")
         if model.model_name == "Swin":
             if args.backbone == "tiny":
-                lr1 = arguments.learning_rates[0][0]
-                lr2 = arguments.learning_rates[0][1]
+                lr1 = args.learning_rates[0][0]
+                lr2 = args.learning_rates[0][1]
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1},
                         {"params": model.decoder.parameters(), "lr": lr2},

@@ -5,6 +5,7 @@ from typing import Union
 from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
+import os
 
 
 class DiceLoss(nn.Module):
@@ -213,6 +214,17 @@ class ModelBase(nn.Module):
                 print(f" | Test Loss: {test_loss:.4f}", end="")
 
             print()
+
+            # Save model every 10 epochs
+            if (epoch + 1) % 10 == 0:
+                save_path = self.file_path
+                if save_path is None:
+                    save_path = f"{self.model_name.lower()}_epoch{epoch+1}.pth"
+                else:
+                    # Insert epoch number before file extension
+                    base, ext = os.path.splitext(save_path)
+                    save_path = f"{base}_epoch{epoch+1}{ext}"
+                self.save(save_path)
 
         if eval_loader is not None:
             eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)

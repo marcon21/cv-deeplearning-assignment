@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from transformers import SwinModel
 from .model_base import ModelBase
 from torch.optim.lr_scheduler import LambdaLR
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import math
 
 def compute_loss_swin(pred, target):
@@ -32,12 +33,19 @@ class SwinTransformer(ModelBase):
         super().__init__(file_path, device, use_wandb)
         self.backbone = SwinModel.from_pretrained(model_name).to(device)
         self.output_dim = self.backbone.config.hidden_size
-
+        self.decoder_name = decoder
         self.decoder = nn.Sequential(
             nn.Conv2d(self.output_dim, 512, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(512, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, num_classes, kernel_size=1),
         )
+        if decoder == "deeplab":
+            self.decoder = DeepLabHead(in_channels=self.output_dim, num_classes=num_classes)
+            
+
+        
         
     def forward(self, x):
         input_size = x.shape[-2:]
@@ -46,7 +54,9 @@ class SwinTransformer(ModelBase):
         H = W = int(N ** 0.5)
         x = x.permute(0, 2, 1).reshape(B, C, H, W)
         x = self.decoder(x)
+        print(f"Decoder output shape: {x.shape}")
         x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False).contiguous()
+        print(f"Final output shape: {x.shape}")
         return x
     
     @staticmethod

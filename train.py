@@ -5,6 +5,7 @@ import torch.optim as optim
 import torch.nn as nn
 import argparse
 import wandb
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 
 from models.unet import UNet
 from models.model1 import Model1
@@ -41,6 +42,13 @@ if __name__ == "__main__":
         type=str,
         default="tiny",
         choices=["tiny", "base", "small"],
+        help="Backbone model size; options: tiny, base, small (default: tiny)",
+    )
+    parser.add_argument(
+        "--decoder",
+        type=str,
+        default="simple",
+        choices=["simple", "deeplab"],
         help="Backbone model size; options: tiny, base, small (default: tiny)",
     )
     parser.add_argument(
@@ -112,7 +120,7 @@ if __name__ == "__main__":
         "Model1": lambda: Model1(input_height=256, input_width=256, output_dim=21, device=device),
         "Swin": lambda: SwinTransformer(
             num_classes=21,
-            decoder=None,
+            decoder=str(args.decoder),
             model_name=backbone,
             device=device,
             file_path=f"./model_saves",

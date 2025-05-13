@@ -86,7 +86,21 @@ class ModelBase(nn.Module):
         if file_path is None:
             file_path = self.file_path
 
-        torch.save(self.state_dict(), file_path)
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        try:
+            torch.save(self.state_dict(), file_path)
+        except Exception as e:
+            print(f"Error saving model to {file_path}: {e}")
+            # Attempt to save to a fallback location
+            fallback_path = os.path.join(self.file_path, "fallback_model.pth")
+            try:
+                torch.save(self.state_dict(), fallback_path)
+                print(f"Model saved to fallback location: {fallback_path}")
+            except Exception as e:
+                print(f"Error saving model to fallback location {fallback_path}: {e}")
+                print("Model saving failed. Check your file path and permissions.")
 
     def load(self, file_path: str = None):
         """
@@ -197,6 +211,18 @@ class ModelBase(nn.Module):
             if self.file_path is not None:
                 self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
 
+            # Save model every epoch
+            try:
+                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
+            except Exception as e:
+                print(f"Error saving model: {e}")
+                # Attempt to save to a fallback location
+                fallback_path = os.path.join(self.file_path, f"fallback_{self.model_name}_epoch_{epoch}.pth")
+                try:
+                    self.save(fallback_path)
+                    print(f"Model saved to fallback location: {fallback_path}")
+                except Exception as e:
+                    print(f"Error saving model to fallback location: {e}")
             print()
 
         if eval_loader is not None:
@@ -224,8 +250,8 @@ class ModelBase(nn.Module):
 
     @staticmethod
     def _compute_miou(pred, target, num_classes=21):
-        pred = pred.view(-1)
-        target = target.view(-1)
+        pred = pred.reshape(-1)
+        target = target.reshape(-1)
         intersection = torch.zeros(num_classes).to(pred.device)
         union = torch.zeros(num_classes).to(pred.device)
 

@@ -4,6 +4,7 @@ import data
 import torch.optim as optim
 import torch.nn as nn
 import argparse
+from transformers import get_cosine_schedule_with_warmup
 
 from models.unet import UNet
 from models.model1 import Model1
@@ -19,7 +20,7 @@ if __name__ == "__main__":
         help="List of training epochs for each model (default: [10]). If one value is provided, it will be used for all models."
     )
     parser.add_argument(
-        "--batch_sizes", type=int, nargs=3, default=[4], help="List of three batch sizes (default: [4]). If one value is provided, it will be used for all models."
+        "--batch_sizes", type=int, nargs="+", default=[4, 4, 4], help="List of three batch sizes (default: [4, 4, 4])."
     )
     parser.add_argument(
         "--models",
@@ -51,8 +52,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=[0.001],
-        help="Learning rate for the optimizer (default: 0.001). If one value is provided, it will be used for all models."
+        default=[0.0005],
+        help="Learning rate for the optimizer (default: 0.0001). If one value is provided, it will be used for all models."
     )
     args = parser.parse_args()
 
@@ -78,9 +79,9 @@ if __name__ == "__main__":
     # Process batch sizes and epochs into lists for each run
     if len(args.batch_sizes) == 1:
         batch_sizes = [args.batch_sizes[0]] * len(args.models)
-    elif len(args.batch_sizes) != len(args.models):
-        raise ValueError("Batch sizes must either be one value or match the number of models.")
     else:
+        if len(args.batch_sizes) != len(args.models):
+            raise ValueError("Batch sizes must either be one value or match the number of models.")
         batch_sizes = args.batch_sizes
 
     if len(args.epochs) == 1:
@@ -148,7 +149,16 @@ if __name__ == "__main__":
         )
 
         print(f"Training {model.model_name}...")
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        if model.model_name == "Swin":
+            optimizer = optim.AdamW({"params": model.backbone.parameters(), "lr": 5e-5, "params": model.decoder.parameters(), "lr": lr}, weight_decay=0.01)
+            scheduler = get_cosine_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=int(0.1 * len(train_loader) * run_params["epochs"]),
+                num_training_steps=epochs * len(train_loader),
+            )
+
+        else:
+            optimizer = optim.Adam(model.parameters(), lr=lr)
         loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         if model.model_name == "Swin":
             loss_fn = compute_loss_swin
@@ -160,5 +170,6 @@ if __name__ == "__main__":
             optimizer=optimizer,
             loss_fn=loss_fn,
             epochs=run_params["epochs"],
+            scheduler=scheduler if model.model_name == "Swin" else None,
         )
         model.save()

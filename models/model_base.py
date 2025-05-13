@@ -1,3 +1,4 @@
+import os
 from torch import nn
 from torch.nn import functional as F
 import torch
@@ -5,6 +6,8 @@ from typing import Union
 from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
+from transformers import get_cosine_schedule_with_warmup
+
 
 
 class ModelBase(nn.Module):
@@ -49,6 +52,17 @@ class ModelBase(nn.Module):
         self.to(self.device)
 
         self.model_name = self.__class__.__name__
+        # parent directory and folder model_saves
+        if file_path is None:
+            # Use the current file's directory to create a default path
+            default_dir = os.path.dirname(os.path.abspath(__file__))
+            self.file_path = os.path.join(
+                os.path.dirname(default_dir), "model_saves"
+            )
+        else:
+            self.file_path = file_path
+        os.makedirs(self.file_path, exist_ok=True)
+
 
         # Initialize wandb if enabled
         if self.use_wandb:
@@ -116,6 +130,8 @@ class ModelBase(nn.Module):
         epochs: int = 1,
         optimizer: torch.optim.Optimizer = None,
         loss_fn: callable = None,
+        scheduler: callable = None,
+        clip_grad: bool = True,
     ) -> None:
         """
         Trains the model for a specified number of epochs using the provided data loaders.
@@ -175,7 +191,11 @@ class ModelBase(nn.Module):
                     )
                 self.test_history.append(test_loss)
                 print(f" | Test Loss: {test_loss:.4f}", end="")
-
+            # save model every epoch
+            if self.file_path is not None:
+                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
+            if scheduler:
+                scheduler.step()
             print()
 
         if eval_loader is not None:
@@ -201,6 +221,7 @@ class ModelBase(nn.Module):
         self.eval()
         print("Training complete.")
 
+    @staticmethod
     def _compute_miou(pred, target, num_classes=21):
         pred = pred.view(-1)
         target = target.view(-1)

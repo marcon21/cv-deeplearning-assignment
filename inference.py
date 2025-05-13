@@ -18,8 +18,8 @@ def get_model_class(class_name):
 
         return Model1
     # Add more models as needed
-    elif class_name == "Model2":
-        from models.swin import Model2
+    elif class_name == "Swin":
+        from models.swin import SwinTransformer as Model2
 
         return Model2
     else:
@@ -205,12 +205,12 @@ def main():
             device=device,
             use_wandb=False,
         )
-    elif args.model_class == "Model2":
+    elif args.model_class == "Swin":
         # Example: Model2(num_classes, decoder, model_name, ...)
         model = ModelClass(
             num_classes=21,
             decoder=None,
-            model_name="microsoft/swin-tiny-patch4-window7-224",
+            model_name="microsoft/swin-small-patch4-window7-224",
             file_path=args.model_path,
             device=device,
             use_wandb=False,

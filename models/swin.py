@@ -5,25 +5,39 @@ from transformers import SwinModel
 from .model_base import ModelBase
 
 class SwinTransformer(ModelBase):
-    def __init__(self, num_classes=21, decoder=None, model_name="microsoft/swin-tiny-patch4-window7-224", file_path=None, device=None, use_wandb=True):
+    def __init__(self,
+                 num_classes=21,
+                 model_name="microsoft/swin-tiny-patch4-window7-224",
+                 file_path=None,
+                 device=None,
+                 use_wandb=True,
+                 decoder=None):
         super().__init__(file_path, device, use_wandb)
         self.backbone = SwinModel.from_pretrained(model_name).to(device)
         self.output_dim = self.backbone.config.hidden_size
+
         self.decoder = nn.Sequential(
-            nn.Conv2d(self.output_dim, 512, kernel_size=1),
+            nn.ConvTranspose2d(self.output_dim, 512, kernel_size=2, stride=2),
+            nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, num_classes, kernel_size=1)
+            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, num_classes, kernel_size=1)
         ).to(device)
 
     def forward(self, x):
         input_size = x.shape[-2:]
-        x = self.backbone(pixel_values=x).last_hidden_state  # (B, 49, 768)
+        x = self.backbone(pixel_values=x).last_hidden_state
         B, N, C = x.shape
         H = W = int(N ** 0.5)
         x = x.permute(0, 2, 1).reshape(B, C, H, W)
-        x = self.decoder(x)  # (B, num_classes, H, W)
-        x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
-        return x  # (B, num_classes, H, W)
+        x = self.decoder(x)
+        x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False).contiguous()
+        return x
     
     @staticmethod
     def _compute_miou(pred, target, num_classes=21, ignore_index=255):

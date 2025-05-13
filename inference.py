@@ -214,12 +214,12 @@ def main():
         )
 
     elif args.model_class == "EfficientNet":
-    model = ModelClass(
-        num_classes=21,
-        file_path=args.model_path,
-        device=device,
-        use_wandb=False,
-    )
+        model = ModelClass(
+            num_classes=21,
+            file_path=args.model_path,
+            device=device,
+            use_wandb=False,
+        )
     
     else:
         raise ValueError("Unknown model class")

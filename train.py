@@ -85,8 +85,8 @@ if __name__ == "__main__":
         # print(model)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        # loss_fn = nn.CrossEntropyLoss(ignore_index=255)
-        loss_fn = DiceLoss(ignore_index=255)
+        loss_fn = nn.CrossEntropyLoss(ignore_index=255)
+        # loss_fn = DiceLoss(ignore_index=255)
 
         model.to(device)
 

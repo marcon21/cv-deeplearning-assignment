@@ -141,7 +141,7 @@ if __name__ == "__main__":
             train=0.80,
             test=0.10,
             eval=0.10,
-            root_dir="./VOC",
+            root_dir="VOC",
             batch_size=run_params["batch_size"],
             num_workers=args.workers,
             grayscale=False,

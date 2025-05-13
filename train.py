@@ -115,7 +115,7 @@ if __name__ == "__main__":
             decoder=None,
             model_name=backbone,
             device=device,
-            file_path=f"./model_saves/swin_transformer_{args.backbone}.pth",
+            file_path=f"./model_saves",
             use_wandb=True,
         ),
     }

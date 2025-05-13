@@ -170,6 +170,8 @@ class ModelBase(nn.Module):
                 loss = loss_fn(outputs, targets)
                 loss.backward()
                 optimizer.step()
+                if scheduler:
+                    scheduler.step()
                 epoch_loss += loss.item()
 
             avg_loss = epoch_loss / len(train_loader)
@@ -194,8 +196,7 @@ class ModelBase(nn.Module):
             # save model every epoch
             if self.file_path is not None:
                 self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
-            if scheduler:
-                scheduler.step()
+
             print()
 
         if eval_loader is not None:

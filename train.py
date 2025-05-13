@@ -58,7 +58,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
-    os.environ["WANDB_MODE"] = "offline"
 
 
     if args.device == "auto":
@@ -150,7 +149,10 @@ if __name__ == "__main__":
 
         print(f"Training {model.model_name}...")
         if model.model_name == "Swin":
-            optimizer = optim.AdamW({"params": model.backbone.parameters(), "lr": 5e-5, "params": model.decoder.parameters(), "lr": lr}, weight_decay=0.01)
+            optimizer = optim.AdamW([
+                    {"params": model.backbone.parameters(), "lr": 5e-5},
+                    {"params": model.decoder.parameters(), "lr": lr},
+                ], weight_decay=0.01)
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=int(0.1 * len(train_loader) * run_params["epochs"]),

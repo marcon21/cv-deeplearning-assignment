@@ -17,18 +17,11 @@ class SwinTransformer(ModelBase):
         self.output_dim = self.backbone.config.hidden_size
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(self.output_dim, 512, kernel_size=2, stride=2),
-            nn.BatchNorm2d(512),
+            nn.Conv2d(self.output_dim, 512, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, num_classes, kernel_size=1)
-        ).to(device)
-
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
+        )
+        
     def forward(self, x):
         input_size = x.shape[-2:]
         x = self.backbone(pixel_values=x).last_hidden_state

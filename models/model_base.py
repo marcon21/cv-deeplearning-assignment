@@ -187,6 +187,7 @@ class ModelBase(nn.Module):
                             f"{self.model_name}/test_loss": test_loss,
                             f"{self.model_name}/test_accuracy": test_accuracy,
                             f"{self.model_name}/f1_score": f1,
+                            f"{self.model_name}/miou": miou,
                             "epoch": epoch,
                         }
                     )

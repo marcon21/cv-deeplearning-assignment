@@ -218,7 +218,6 @@ def main():
             num_classes=21,
             file_path=args.model_path,
             device=device,
-            use_wandb=False,
         )
     
     else:

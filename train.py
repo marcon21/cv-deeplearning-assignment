@@ -7,6 +7,7 @@ import argparse
 
 from models.unet import UNet
 from models.model1 import Model1
+from models.model_base import DiceLoss
 
 # from models.model2 import Model2
 # from models.model3 import Model3
@@ -84,7 +85,9 @@ if __name__ == "__main__":
         # print(model)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        loss_fn = nn.CrossEntropyLoss(ignore_index=255)
+        # loss_fn = nn.CrossEntropyLoss(ignore_index=255)
+        loss_fn = DiceLoss(ignore_index=255)
+
         model.to(device)
 
         model.train_model(

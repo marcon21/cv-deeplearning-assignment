@@ -121,8 +121,10 @@ if __name__ == "__main__":
             file_path=f"./model_saves/swin_transformer_{args.backbone}.pth",
             use_wandb=True,
         ),
-        "EfficientNet": lambda: EfficientNet(num_classes=21),
-
+        "EfficientNet": lambda: EfficientNet(
+            num_classes=21,
+            file_path="model_saves/efficientnet.pth",
+        )
     }
 
     # Build parameter sets for each run

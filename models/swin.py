@@ -6,6 +6,7 @@ from .model_base import ModelBase
 from torch.optim.lr_scheduler import LambdaLR
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import math
+from functools import partial
 
 def compute_loss_swin(pred, target):
     # Resize logits to match target size
@@ -20,7 +21,8 @@ def _lr_lambda(current_step, warmup_steps, total_steps):
     return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
 
 def get_scheduler(optimizer):
-    LambdaLR(optimizer, _lr_lambda)
+    lr_lambda = partial(_lr_lambda, warmup_steps=1000, total_steps=10000)
+    return LambdaLR(optimizer, lr_lambda)
 
 class SwinTransformer(ModelBase):
     def __init__(self,

@@ -150,7 +150,7 @@ if __name__ == "__main__":
     lr = 0.0001
     
     # Execute training for each run
-    for run_params in runs:
+    for i, run_params in enumerate(runs):
         model = run_params["constructor"]()
 
         train_loader, test_loader, eval_loader = data.load_data(
@@ -166,10 +166,10 @@ if __name__ == "__main__":
 
         print(f"Training {model.model_name}...")
         if model.model_name == "SwinTransformer":
-            lr1 = args.learning_rates[0][0]
-            lr2 = args.learning_rates[0][1]
-            weight_decay = args.weight_decays[0][0]
-            weight_decay2 = args.weight_decays[0][1]
+            lr1 = args.learning_rates[i][0] if len(args.learning_rates) > i else args.learning_rates[-1][0]
+            lr2 = args.learning_rates[i][1] if len(args.learning_rates) > i else args.learning_rates[-1][1]
+            weight_decay = args.weight_decays[i][0] if len(args.weight_decays) > i else args.weight_decays[-1][0]
+            weight_decay2 = args.weight_decays[i][1] if len(args.weight_decays) > i else args.weight_decays[-1][1]
             if args.backbone == "tiny":
 
                 optimizer = optim.AdamW([
@@ -178,13 +178,13 @@ if __name__ == "__main__":
                     ])
             elif args.backbone == "base":
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": lr1},
-                        {"params": model.decoder.parameters(), "lr": lr2},
+                        {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
+                        {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},
                     ])
             elif args.backbone == "small":
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": lr1},
-                        {"params": model.decoder.parameters(), "lr": lr2},
+                        {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
+                        {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},
                     ])
             scheduler = get_scheduler(optimizer, warmup_steps=int(run_params["epochs"] * len(train_loader)*0.05), total_steps=run_params["epochs"] * len(train_loader))
             print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
@@ -192,9 +192,10 @@ if __name__ == "__main__":
 
         else:
             optimizer = optim.Adam(model.parameters(), lr=lr)
-        loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         if model.model_name == "Swin":
             loss_fn = compute_loss_swin
+        else:
+            loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         model.to(device)
         model.train_model(
             train_loader=train_loader,

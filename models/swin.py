@@ -11,7 +11,7 @@ from functools import partial
 def compute_loss_swin(pred, target):
     # Resize logits to match target size
     pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False).contiguous()
-    loss = F.cross_entropy(pred, target)
+    loss = F.cross_entropy(pred, target, ignore_index=255)
     return loss
 
 def _lr_lambda(current_step, warmup_steps, total_steps):

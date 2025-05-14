@@ -61,7 +61,7 @@ if __name__ == "__main__":
         "--learning_rates",
         type=float,
         nargs="+",
-        default=[[6e-5, 6e-4]],
+        default=[6e-5, 6e-4],
         help="Learning rate for the optimizer (default: 0.0001). If one value is provided, it will be used for all models."
     )
     parser.add_argument(
@@ -166,10 +166,10 @@ if __name__ == "__main__":
 
         print(f"Training {model.model_name}...")
         if model.model_name == "SwinTransformer":
-            lr1 = args.learning_rates[i][0] if len(args.learning_rates) > i else args.learning_rates[-1][0]
-            lr2 = args.learning_rates[i][1] if len(args.learning_rates) > i else args.learning_rates[-1][1]
-            weight_decay = args.weight_decays[i][0] if len(args.weight_decays) > i else args.weight_decays[-1][0]
-            weight_decay2 = args.weight_decays[i][1] if len(args.weight_decays) > i else args.weight_decays[-1][1]
+            lr1 = args.learning_rates[0]
+            lr2 = args.learning_rates[1]
+            weight_decay = args.weight_decays[0]
+            weight_decay2 = args.weight_decays[1]
             if args.backbone == "tiny":
 
                 optimizer = optim.AdamW([

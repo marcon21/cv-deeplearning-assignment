@@ -1,48 +1,66 @@
 # cv-deeplearning-assignment
 
-### Model Implementation
+### Inference and Visualization
 
-All the models are implemented in the `models` directory. All the models inherit from the class `BaseModel` from `models/base_model.py` all the training methods and logging functions.
+The `inference.py` script not only performs inference on test examples but also provides additional visualization options. The script:
 
-The data loading is done in the file `data.py`.
+• Loads test data using `data.load_data` and selects a subset of examples.  
+• Dynamically imports the model class (e.g., `UNet`, `Model1`, or `Swin`) based on the provided `--model_class` argument.  
+• Loads model weights via the `--model_path` argument and runs inference on the test images.
 
-## Training
+The script outputs several files for each example:
+• The original input image (after normalization).  
+• The ground truth mask (with a Pascal VOC color palette for clarity).  
+• The prediction mask (using the same palette).  
+• A concatenated image that joins the input, ground truth, and prediction images side-by-side.  
+• An overlapped image where:
+  - Ground truth areas are blended in red.
+  - Predicted regions are blended in green.
 
-To train the model, run `train.py` with customizable options:
+### Command-Line Arguments
 
-```
-python train.py [--epochs N] [--batch_size N] [--models MODEL1 MODEL2 ...] [--device DEVICE]
-```
+- `--model_class` : Model class name (e.g., `UNet`, `Model1`, `Swin`).
+- `--model_path`  : File path for the model weights.
+- `--num_examples` : Number of examples on which to run inference (default: 5).
+- `--backbone` : Backbone model size for `Swin` (options: `tiny`, `base`, `small`; default: `tiny`).
+- `--decoder` : Decoder type for `Swin` (options: `simple`, `deeplab`; default: `simple`).
 
-### Options
+The device for inference is selected automatically (prioritizing CUDA, then MPS, then CPU).
 
-- `--epochs N` : Number of training epochs (default: 10)
-- `--batch_size N` : Batch size (default: 16)
-- `--models ...` : List of model class names to train (e.g., UNet Model1). If not specified, no models are trained by default. Example: `--models UNet Model1`
-- `--device DEVICE` : Device to use for training. Options: `auto`, `cpu`, `cuda`, `mps` (default: `auto`).
-  - `auto` will select `cuda` if available, then `mps`, then `cpu`.
+### Example Usage
 
-#### Example usage
+To run inference on a `Swin` model with a `tiny` backbone and `simple` decoder for 5 examples:
 
-Train UNet for 20 epochs on CUDA (if available):
+  python inference.py --model_class Swin --model_path ./model_saves/swin.pth --num_examples 5 --backbone tiny --decoder simple
 
-```
-python train.py --epochs 20 --models UNet --device cuda
-```
+The generated images are saved in the folder `out/examples`.
 
-Train both UNet and Model1 with batch size 8 on CPU:
+### Function Overview
 
-```
-python train.py --batch_size 8 --models UNet Model1 --device cpu
-```
+- get_model_class(class_name): Dynamically imports and returns the requested model class.
+- get_voc_palette(num_classes=21): Returns the Pascal VOC color palette adjusted to 256×3 entries.
+- save_image(tensor, path, is_mask=False): Saves a tensor as an image; applies appropriate scaling and palette for masks.
+- concat_and_save_images(...): Concatenates the input image, ground truth, and prediction for easy comparison.
+- save_overlapped_images(...): Overlays ground truth (red) and prediction (green) on the input image using blending.
 
-## Inference
+This enhanced inference script streamlines evaluation by combining prediction, visual comparison, and result saving in one run.
 
-`inference.py` is still TODO
-for now can be run with
+### Training
 
-```
-python inference.py --model_name <model_name> --model_path <model_path> --image_path <image_path>
+The `train.py` script supports training multiple models, including `UNet`, `Model1`, and `Swin`. It allows customization of training parameters such as epochs, batch sizes, learning rates, and weight decays.
 
-python inference.py --model_class UNet --model_path ./model_saves/unet.pth
-```
+### Command-Line Arguments
+
+- `--models` : List of model class names to train (e.g., `UNet`, `Model1`, `Swin`).
+- `--epochs` : List of training epochs for each model (default: `[10]`).
+- `--batch_sizes` : List of batch sizes for each model (default: `[4, 4, 4]`).
+- `--backbone` : Backbone model size for `Swin` (options: `tiny`, `base`, `small`; default: `tiny`).
+- `--decoder` : Decoder type for `Swin` (options: `simple`, `deeplab`; default: `simple`).
+- `--learning_rates` : Learning rates for the optimizer (default: `[[6e-5, 6e-4]]`).
+- `--weight_decays` : Weight decays for the optimizer (default: `[[1e-4, 5e-4]]`).
+
+### Example Usage
+
+To train a `Swin` model with a `tiny` backbone and `simple` decoder:
+
+  python train.py --models Swin --epochs 20 --batch_sizes 8 --backbone tiny --decoder simple

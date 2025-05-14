@@ -18,6 +18,10 @@ def get_model_class(class_name):
 
         return Model1
     # Add more models as needed
+    elif class_name == "Swin":
+        from models.swin import SwinTransformer as Model2
+
+        return Model2
     else:
         raise ValueError(f"Unknown model class: {class_name}")
 
@@ -127,6 +131,37 @@ def concat_and_save_images(input_path, gt_path, pred_path, out_path):
         x_offset += img.width
     new_img.save(out_path)
 
+def save_overlapped_images(input_path, gt_path, pred_path, out_path):
+    input_img = Image.open(input_path).convert("RGBA")
+    gt_img = Image.open(gt_path).convert("L")
+    pred_img = Image.open(pred_path).convert("L")
+
+    overlapped_img = input_img.copy()
+    pixels = overlapped_img.load()
+    input_pixels = input_img.load()
+    alpha_gt = 0.5  
+    alpha_pred = 0.5  
+
+    def blend(background, overlay, alpha):
+        return tuple(
+            int(alpha * overlay[i] + (1 - alpha) * background[i]) for i in range(3)
+        ) + (255,)
+
+    for x in range(input_img.width):
+        for y in range(input_img.height):
+            bg_pixel = input_pixels[x, y]
+            gt_val = gt_img.getpixel((x, y))
+            pred_val = pred_img.getpixel((x, y))
+            if gt_val != 0:  # ground truth: red overlay
+                pixels[x, y] = blend(bg_pixel, (255, 0, 0), alpha_gt)
+            elif pred_val != 0:  # prediction: green overlay
+                pixels[x, y] = blend(bg_pixel, (0, 255, 0), alpha_pred)
+            else:
+                pixels[x, y] = bg_pixel
+
+    overlapped_img = overlapped_img.convert("RGB")
+    overlapped_img.save(out_path)
+
 
 def main():
     import argparse
@@ -143,6 +178,20 @@ def main():
         type=int,
         default=5,
         help="Number of examples to run inference on",
+    )
+    parser.add_argument(
+        "--backbone",
+        type=str,
+        default="tiny",
+        choices=["tiny", "base", "small"],
+        help="Backbone model size; options: tiny, base, small (default: tiny)",
+    )
+    parser.add_argument(
+        "--decoder",
+        type=str,
+        default="simple",
+        choices=["simple", "deeplab"],
+        help="Decoder type; options: simple, deeplab (default: simple)",
     )
     args = parser.parse_args()
 
@@ -167,6 +216,25 @@ def main():
             input_height=256,
             input_width=256,
             output_dim=21,
+            device=device,
+            use_wandb=False,
+        )
+    elif args.model_class == "Swin":
+        model_name = None
+        if args.backbone == "tiny":
+            model_name = "swin_tiny_patch4_window7_224"
+        elif args.backbone == "base":
+            model_name = "swin_base_patch4_window7_224"
+        elif args.backbone == "small":
+            model_name = "swin_small_patch4_window7_224"
+        else:
+            raise ValueError(f"Unknown backbone: {args.backbone}")
+        # Example: Model2(num_classes, decoder, model_name, ...)
+        model = ModelClass(
+            num_classes=21,
+            decoder=args.decoder,
+            model_name=model_name,
+            file_path=f"./model_saves/{args.model_class}",
             device=device,
             use_wandb=False,
         )
@@ -200,6 +268,9 @@ def main():
         concat_path = os.path.join(out_dir, f"{count}_concat.png")
         concat_and_save_images(input_path, gt_path, pred_path, concat_path)
         count += 1
+        # Save overlapped image
+        overlapped_path = os.path.join(out_dir, f"{count}_overlapped.png")
+        save_overlapped_images(input_path, gt_path, pred_path, overlapped_path)
     print(f"Saved {count} examples to {out_dir}")
 
 

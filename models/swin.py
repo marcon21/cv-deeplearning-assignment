@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import math
 from functools import partial
+from aspp_decoder import ASPPDecoder
 
 def compute_loss_swin(pred, target):
     # Resize logits to match target size
@@ -47,6 +48,8 @@ class SwinTransformer(ModelBase):
         )
         if decoder == "deeplab":
             self.decoder = DeepLabHead(in_channels=self.output_dim, num_classes=num_classes)
+        elif decoder == "aspp":
+            self.decoder = ASPPDecoder(in_channels=self.output_dim, num_classes=num_classes)
 
     def forward(self, x):
         input_size = x.shape[-2:]

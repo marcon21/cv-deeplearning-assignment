@@ -48,7 +48,7 @@ if __name__ == "__main__":
         "--decoder",
         type=str,
         default="simple",
-        choices=["simple", "deeplab"],
+        choices=["simple", "deeplab", "aspp"],
         help="Backbone model size; options: tiny, base, small (default: tiny)",
     )
     parser.add_argument(
@@ -171,7 +171,6 @@ if __name__ == "__main__":
             weight_decay = args.weight_decays[0]
             weight_decay2 = args.weight_decays[1]
             if args.backbone == "tiny":
-
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
                         {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},

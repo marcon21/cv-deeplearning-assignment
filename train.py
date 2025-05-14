@@ -114,7 +114,8 @@ if __name__ == "__main__":
             "tiny": "microsoft/swin-tiny-patch4-window7-224",
             "base": "microsoft/swin-base-patch4-window7-224",
             "small": "microsoft/swin-small-patch4-window7-224",
-        }
+            "base384": "microsoft/swin-base-patch4-window7-384",
+                    }
         try:
             backbone = backbone_map[args.backbone]
         except KeyError:
@@ -160,6 +161,7 @@ if __name__ == "__main__":
             batch_size=run_params["batch_size"],
             num_workers=args.workers,
             grayscale=False,
+            resize= (224, 224) if model.model_name == "Swin" else (256, 256),
         )
 
         print(f"Training {model.model_name}...")

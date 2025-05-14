@@ -10,42 +10,6 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 
 
-class DiceLoss(nn.Module):
-    def __init__(self, ignore_index=255, smooth=1.0):
-        super(DiceLoss, self).__init__()
-        self.ignore_index = ignore_index
-        self.smooth = smooth
-
-    def forward(self, inputs, targets):
-        # inputs: (N, C, H, W), targets: (N, H, W)
-        num_classes = inputs.shape[1]
-        inputs = F.softmax(inputs, dim=1)
-        # One-hot encode targets, ignore ignore_index
-        targets_one_hot = torch.zeros_like(inputs)
-        valid_mask = targets != self.ignore_index
-        for c in range(num_classes):
-            targets_one_hot[:, c][valid_mask] = (targets[valid_mask] == c).float()
-        # Flatten
-        inputs = inputs.permute(1, 0, 2, 3).contiguous().view(num_classes, -1)
-        targets_one_hot = (
-            targets_one_hot.permute(1, 0, 2, 3).contiguous().view(num_classes, -1)
-        )
-        # Only compute Dice for valid pixels
-        mask = valid_mask.view(-1)
-        dice = 0
-        for c in range(num_classes):
-            if mask.sum() == 0:
-                continue
-            input_c = inputs[c][mask]
-            target_c = targets_one_hot[c][mask]
-            intersection = (input_c * target_c).sum()
-            union = input_c.sum() + target_c.sum()
-            dice_c = (2.0 * intersection + self.smooth) / (union + self.smooth)
-            dice += dice_c
-        dice = dice / num_classes
-        return 1 - dice
-
-
 class ModelBase(nn.Module):
     def __init__(
         self,

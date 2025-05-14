@@ -29,6 +29,7 @@ class EfficientNet(ModelBase):
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
+            nn.Dropout(p=0.3),
             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),

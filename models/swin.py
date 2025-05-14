@@ -20,8 +20,8 @@ def _lr_lambda(current_step, warmup_steps, total_steps):
     progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
     return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
 
-def get_scheduler(optimizer):
-    lr_lambda = partial(_lr_lambda, warmup_steps=1000, total_steps=10000)
+def get_scheduler(optimizer, warmup_steps, total_steps):
+    lr_lambda = partial(_lr_lambda, warmup_steps=warmup_steps, total_steps=total_steps)
     return LambdaLR(optimizer, lr_lambda)
 
 class SwinTransformer(ModelBase):

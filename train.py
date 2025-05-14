@@ -185,7 +185,7 @@ if __name__ == "__main__":
                         {"params": model.backbone.parameters(), "lr": lr1},
                         {"params": model.decoder.parameters(), "lr": lr2},
                     ], weight_decay=0.01)
-            scheduler = get_scheduler(optimizer)
+            scheduler = get_scheduler(optimizer, warmup_steps=int(run_params["epochs"] * len(train_loader)*0.05), total_steps=run_params["epochs"] * len(train_loader))
             print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
             
 

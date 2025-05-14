@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import math
 from functools import partial
-from aspp_decoder import ASPPDecoder
+from .aspp_decoder import ASPPDecoder
 
 def compute_loss_swin(pred, target):
     # Resize logits to match target size

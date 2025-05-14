@@ -165,7 +165,7 @@ if __name__ == "__main__":
         )
 
         print(f"Training {model.model_name}...")
-        if model.model_name == "Swin":
+        if model.model_name == "SwinTransformer":
             if args.backbone == "tiny":
                 lr1 = args.learning_rates[0][0]
                 lr2 = args.learning_rates[0][1]
@@ -179,12 +179,12 @@ if __name__ == "__main__":
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1},
                         {"params": model.decoder.parameters(), "lr": lr2},
-                    ], weight_decay=0.01)
+                    ])
             elif args.backbone == "small":
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1},
                         {"params": model.decoder.parameters(), "lr": lr2},
-                    ], weight_decay=0.01)
+                    ])
             scheduler = get_scheduler(optimizer, warmup_steps=int(run_params["epochs"] * len(train_loader)*0.05), total_steps=run_params["epochs"] * len(train_loader))
             print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
             

@@ -41,7 +41,7 @@ def load_data(
     # Enhanced transforms with normalization
     transform = transforms.Compose(
         [
-            transforms.Resize((256, 256)),
+            transforms.Resize((64, 64)),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -57,7 +57,7 @@ def load_data(
     target_transform = transforms.Compose(
         [
             transforms.Resize(
-                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
+                (64, 64), interpolation=transforms.InterpolationMode.NEAREST
             ),
             transforms.PILToTensor(),
         ]

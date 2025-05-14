@@ -67,6 +67,10 @@ class SwinTransformer(ModelBase):
             pred = torch.argmax(pred, dim=1)  # (B, H, W)
         assert pred.shape == target.shape, "Shape mismatch between pred and target"
 
+
+        valid_mask = (target != ignore_index)
+        pred = pred[valid_mask]
+        target = target[valid_mask]
         ious = []
         for cls in range(num_classes):
             if cls == ignore_index:

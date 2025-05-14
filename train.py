@@ -203,6 +203,6 @@ if __name__ == "__main__":
             optimizer=optimizer,
             loss_fn=loss_fn,
             epochs=run_params["epochs"],
-            scheduler=scheduler if model.model_name == "Swin" else None,
+            scheduler=scheduler if model.model_name == "SwinTransformer" else None,
         )
         model.save()

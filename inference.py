@@ -179,6 +179,20 @@ def main():
         default=5,
         help="Number of examples to run inference on",
     )
+    parser.add_argument(
+        "--backbone",
+        type=str,
+        default="tiny",
+        choices=["tiny", "base", "small"],
+        help="Backbone model size; options: tiny, base, small (default: tiny)",
+    )
+    parser.add_argument(
+        "--decoder",
+        type=str,
+        default="simple",
+        choices=["simple", "deeplab"],
+        help="Decoder type; options: simple, deeplab (default: simple)",
+    )
     args = parser.parse_args()
 
     device = (
@@ -206,12 +220,21 @@ def main():
             use_wandb=False,
         )
     elif args.model_class == "Swin":
+        model_name = None
+        if args.backbone == "tiny":
+            model_name = "swin_tiny_patch4_window7_224"
+        elif args.backbone == "base":
+            model_name = "swin_base_patch4_window7_224"
+        elif args.backbone == "small":
+            model_name = "swin_small_patch4_window7_224"
+        else:
+            raise ValueError(f"Unknown backbone: {args.backbone}")
         # Example: Model2(num_classes, decoder, model_name, ...)
         model = ModelClass(
             num_classes=21,
-            decoder=None,
-            model_name="microsoft/swin-small-patch4-window7-224",
-            file_path=args.model_path,
+            decoder=args.decoder,
+            model_name=model_name,
+            file_path=f"./model_saves/{args.model_class}",
             device=device,
             use_wandb=False,
         )

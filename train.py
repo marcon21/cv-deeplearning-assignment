@@ -64,6 +64,13 @@ if __name__ == "__main__":
         default=[[6e-5, 6e-4]],
         help="Learning rate for the optimizer (default: 0.0001). If one value is provided, it will be used for all models."
     )
+    parser.add_argument(
+        "--weight_decays",
+        type=float,
+        nargs="+",
+        default=[[1e-4, 5e-4]],
+        help="Weight decay for the optimizer (default: 0.01). If one value is provided, it will be used for all models."
+    )
     args = parser.parse_args()
 
     os.environ["WANDB_SILENT"] = "true"
@@ -160,10 +167,12 @@ if __name__ == "__main__":
             if args.backbone == "tiny":
                 lr1 = args.learning_rates[0][0]
                 lr2 = args.learning_rates[0][1]
+                weight_decay = args.weight_decays[0][0]
+                weight_decay2 = args.weight_decays[0][1]
                 optimizer = optim.AdamW([
-                        {"params": model.backbone.parameters(), "lr": lr1},
-                        {"params": model.decoder.parameters(), "lr": lr2},
-                    ], weight_decay=0.01)
+                        {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
+                        {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},
+                    ])
             elif args.backbone == "base":
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1},

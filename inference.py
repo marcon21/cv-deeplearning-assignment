@@ -6,6 +6,7 @@ import numpy as np
 
 # Dynamically import model class
 import importlib
+from models.swin import SwinTransformer
 
 
 def get_model_class(class_name):
@@ -19,9 +20,9 @@ def get_model_class(class_name):
         return Model1
     # Add more models as needed
     elif class_name == "Swin":
-        from models.swin import SwinTransformer as Model2
+        from models.swin import SwinTransformer as SwinTransformer
 
-        return Model2
+        return SwinTransformer
     else:
         raise ValueError(f"Unknown model class: {class_name}")
 
@@ -190,7 +191,7 @@ def main():
         "--decoder",
         type=str,
         default="simple",
-        choices=["simple", "deeplab"],
+        choices=["simple", "deeplab","aspp"],
         help="Decoder type; options: simple, deeplab (default: simple)",
     )
     args = parser.parse_args()
@@ -222,11 +223,11 @@ def main():
     elif args.model_class == "Swin":
         model_name = None
         if args.backbone == "tiny":
-            model_name = "swin_tiny_patch4_window7_224"
+            model_name = "microsoft/swin-tiny-patch4-window7-224"
         elif args.backbone == "base":
-            model_name = "swin_base_patch4_window7_224"
+            model_name = "microsoft/swin-base-patch4-window7-224"
         elif args.backbone == "small":
-            model_name = "swin_small_patch4_window7_224"
+            model_name = "microsoft/swin-small-patch4-window7-224"
         else:
             raise ValueError(f"Unknown backbone: {args.backbone}")
         # Example: Model2(num_classes, decoder, model_name, ...)
@@ -234,7 +235,7 @@ def main():
             num_classes=21,
             decoder=args.decoder,
             model_name=model_name,
-            file_path=f"./model_saves/{args.model_class}",
+            file_path="./model_saves",
             device=device,
             use_wandb=False,
         )

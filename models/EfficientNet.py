@@ -17,12 +17,16 @@ class EfficientNet(ModelBase):
         # Decoder: Upsample back to original resolution
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(1280, 512, kernel_size=2, stride=2),
+            nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(64, num_classes, kernel_size=2, stride=2)
         )

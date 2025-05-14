@@ -14,6 +14,10 @@ class EfficientNet(ModelBase):
         backbone = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
         self.encoder = backbone.features  # [B, 1280, H/32, W/32]
 
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+
+
         # Decoder: Upsample back to original resolution
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(1280, 512, kernel_size=2, stride=2),

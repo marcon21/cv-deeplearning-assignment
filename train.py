@@ -166,11 +166,12 @@ if __name__ == "__main__":
 
         print(f"Training {model.model_name}...")
         if model.model_name == "SwinTransformer":
+            lr1 = args.learning_rates[0][0]
+            lr2 = args.learning_rates[0][1]
+            weight_decay = args.weight_decays[0][0]
+            weight_decay2 = args.weight_decays[0][1]
             if args.backbone == "tiny":
-                lr1 = args.learning_rates[0][0]
-                lr2 = args.learning_rates[0][1]
-                weight_decay = args.weight_decays[0][0]
-                weight_decay2 = args.weight_decays[0][1]
+
                 optimizer = optim.AdamW([
                         {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
                         {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},

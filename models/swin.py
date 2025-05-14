@@ -14,14 +14,17 @@ def compute_loss_swin(pred, target):
     loss = F.cross_entropy(pred, target, ignore_index=255)
     return loss
 
-def _lr_lambda(current_step, warmup_steps, total_steps):
-    if current_step < warmup_steps:
-        return float(current_step) / float(max(1, warmup_steps))
-    progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-    return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+def make_lr_lambda(warmup_steps, total_steps):
+    def lr_lambda(current_step):
+        if current_step < warmup_steps:
+            return float(current_step + 1) / float(max(1, warmup_steps))  # avoid 0 at step 0
+        progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+    return lr_lambda
+
 
 def get_scheduler(optimizer, warmup_steps, total_steps):
-    lr_lambda = partial(_lr_lambda, warmup_steps=warmup_steps, total_steps=total_steps)
+    lr_lambda = partial(make_lr_lambda, warmup_steps=warmup_steps, total_steps=total_steps)
     return LambdaLR(optimizer, lr_lambda)
 
 class SwinTransformer(ModelBase):

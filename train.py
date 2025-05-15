@@ -152,7 +152,7 @@ if __name__ == "__main__":
         })
 
     lr = 0.0001
-    
+    print(f"training models: {args.models}")
     # Execute training for each run
     for i, run_params in enumerate(runs):
         model = run_params["constructor"]()
@@ -165,7 +165,7 @@ if __name__ == "__main__":
             batch_size=run_params["batch_size"],
             num_workers=args.workers,
             grayscale=False,
-            resize= (224, 224) if model.model_name == "Swin"  or "EfficientNet" else (256, 256),
+            resize = (224, 224) if model.model_name in ["SwinTransformer", "EfficientNet"] else (256, 256),
         )
 
         print(f"Training {model.model_name}...")
@@ -202,9 +202,9 @@ if __name__ == "__main__":
 
         else:
             optimizer = optim.Adam(model.parameters(), lr=lr)
-        if model.model_name == "Swin":
+        if isinstance(model, SwinTransformer):
             loss_fn = compute_loss_swin
-        elif model.model_name == "EfficientNet":
+        elif isinstance(model, EfficientNet):
             loss_fn = compute_loss_effnet
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=255)

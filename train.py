@@ -8,7 +8,7 @@ import wandb
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 
 from models.unet import UNet
-from models.model1 import Model1
+from models.efficientnet import EfficientNet, compute_loss_effnet
 from models.swin import SwinTransformer, compute_loss_swin, get_scheduler
 # from models.model3 import Model3
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         default=[],
-        help="List of model class names to train.",
+        help="List of model class names to train, e.g., UNet, EfficientNet , Swin. (default: [])",
     )
     parser.add_argument(
         "--device",
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         "--weight_decays",
         type=float,
         nargs="+",
-        default=[[1e-4, 5e-4]],
+        default=[1e-4, 5e-4],
         help="Weight decay for the optimizer (default: 0.01). If one value is provided, it will be used for all models."
     )
     args = parser.parse_args()
@@ -121,10 +121,15 @@ if __name__ == "__main__":
             raise ValueError(f"Unknown backbone: {args.backbone}. Choose from {list(backbone_map.keys())}.")
         print(f"Using backbone: {backbone}")
 
+
     # Map model class names to constructors with required args
     model_classes = {
         "UNet": lambda: UNet(input_channels=3, output_channels=21, device=device),
-        "Model1": lambda: Model1(input_height=256, input_width=256, output_dim=21, device=device),
+        "EfficientNet": lambda: EfficientNet(
+            num_classes=21,
+            file_path=f"./model_saves/efficientnet_{args.backbone}.pth",
+            device=device,
+        ),
         "Swin": lambda: SwinTransformer(
             num_classes=21,
             decoder=str(args.decoder),
@@ -160,11 +165,11 @@ if __name__ == "__main__":
             batch_size=run_params["batch_size"],
             num_workers=args.workers,
             grayscale=False,
-            resize= (224, 224) if model.model_name == "Swin" else (256, 256),
+            resize= (224, 224) if model.model_name == "Swin"  or "EfficientNet" else (256, 256),
         )
 
         print(f"Training {model.model_name}...")
-        if model.model_name == "SwinTransformer":
+        if model.model_name == "SwinTransformer" or model.model_name == "EfficientNet":
             lr1 = args.learning_rates[0]
             lr2 = args.learning_rates[1]
             weight_decay = args.weight_decays[0]
@@ -184,6 +189,13 @@ if __name__ == "__main__":
                         {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
                         {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},
                     ])
+            elif model.model_name == "EfficientNet":
+                optimizer = optim.AdamW([
+                        {"params": model.backbone.parameters(), "lr": lr1, "weight_decay": weight_decay},
+                        {"params": model.decoder.parameters(), "lr": lr2, "weight_decay": weight_decay2},
+                    ])
+            else:
+                raise ValueError(f"Unknown model: {model.model_name}. Choose from SwinTransformer, EfficientNet.")
             scheduler = get_scheduler(optimizer, warmup_steps=int(run_params["epochs"] * len(train_loader)*0.05), total_steps=run_params["epochs"] * len(train_loader))
             print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
             
@@ -192,6 +204,8 @@ if __name__ == "__main__":
             optimizer = optim.Adam(model.parameters(), lr=lr)
         if model.model_name == "Swin":
             loss_fn = compute_loss_swin
+        elif model.model_name == "EfficientNet":
+            loss_fn = compute_loss_effnet
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         model.to(device)
@@ -202,6 +216,6 @@ if __name__ == "__main__":
             optimizer=optimizer,
             loss_fn=loss_fn,
             epochs=run_params["epochs"],
-            scheduler=scheduler if model.model_name == "SwinTransformer" else None,
+            scheduler=scheduler if model.model_name == "SwinTransformer" or model.model_name == "EfficientNet" else None,
         )
         model.save()

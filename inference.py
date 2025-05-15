@@ -191,7 +191,8 @@ def main():
     )
 
     # Load data (use test set)
-    _, test_loader, _ = data.load_data(batch_size=1)
+    test_loader = None
+    
 
     # Dynamically get model class
     for model, index in zip(args.model_class, range(len(args.model_class))):
@@ -202,17 +203,13 @@ def main():
             model = ModelClass(
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
-        elif model == "Model1":
-            # Example: Model1(input_height, input_width, output_dim, ...)
+        elif model == "EfficientNet":
+            _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(
-                input_height=256,
-                input_width=256,
-                output_dim=21,
-                device=device,
-                use_wandb=False,
+                num_classes=21,
             )
         elif model == "Swin":
-            # Example: Model2(num_classes, decoder, model_name, ...)
+            _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(
                 num_classes=21,
                 decoder="aspp",
@@ -224,6 +221,7 @@ def main():
         model.load(args.model_paths[index])
         model.to(device)
         model.eval()
+
 
         # Prepare output directory
         out_dir = os.path.join("out", "examples")

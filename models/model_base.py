@@ -139,6 +139,10 @@ class ModelBase(nn.Module):
 
         for epoch in range(epochs):
             epoch_loss = 0.0
+            if epoch == 3 and self.model_name == "EfficientNet":
+                print("Unfreezing EfficientNet encoder.")
+                for param in self.encoder.parameters():
+                    param.requires_grad = True
 
             for inputs, targets in tqdm(
                 train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False

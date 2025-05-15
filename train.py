@@ -114,7 +114,6 @@ if __name__ == "__main__":
             "tiny": "microsoft/swin-tiny-patch4-window7-224",
             "base": "microsoft/swin-base-patch4-window7-224",
             "small": "microsoft/swin-small-patch4-window7-224",
-            "base384": "microsoft/swin-base-patch4-window7-384",
                     }
         try:
             backbone = backbone_map[args.backbone]

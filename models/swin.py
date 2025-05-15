@@ -7,21 +7,24 @@ from torch.optim.lr_scheduler import LambdaLR
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 import math
 from functools import partial
+from .aspp_decoder import ASPPDecoder
 
 def compute_loss_swin(pred, target):
     # Resize logits to match target size
     pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False).contiguous()
-    loss = F.cross_entropy(pred, target)
+    loss = F.cross_entropy(pred, target, ignore_index=255)
     return loss
 
-def _lr_lambda(current_step, warmup_steps, total_steps):
-    if current_step < warmup_steps:
-        return float(current_step) / float(max(1, warmup_steps))
-    progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-    return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+def make_lr_lambda(warmup_steps, total_steps):
+    def lr_lambda(current_step):
+        if current_step < warmup_steps:
+            return float(current_step + 1) / float(max(1, warmup_steps))  # avoids 0
+        progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+    return lr_lambda
 
 def get_scheduler(optimizer, warmup_steps, total_steps):
-    lr_lambda = partial(_lr_lambda, warmup_steps=warmup_steps, total_steps=total_steps)
+    lr_lambda = make_lr_lambda(warmup_steps, total_steps)
     return LambdaLR(optimizer, lr_lambda)
 
 class SwinTransformer(ModelBase):
@@ -45,6 +48,8 @@ class SwinTransformer(ModelBase):
         )
         if decoder == "deeplab":
             self.decoder = DeepLabHead(in_channels=self.output_dim, num_classes=num_classes)
+        elif decoder == "aspp":
+            self.decoder = ASPPDecoder(in_channels=self.output_dim, num_classes=num_classes)
 
     def forward(self, x):
         input_size = x.shape[-2:]
@@ -62,6 +67,10 @@ class SwinTransformer(ModelBase):
             pred = torch.argmax(pred, dim=1)  # (B, H, W)
         assert pred.shape == target.shape, "Shape mismatch between pred and target"
 
+
+        valid_mask = (target != ignore_index)
+        pred = pred[valid_mask]
+        target = target[valid_mask]
         ious = []
         for cls in range(num_classes):
             if cls == ignore_index:

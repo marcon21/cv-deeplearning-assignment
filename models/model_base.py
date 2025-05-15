@@ -185,6 +185,13 @@ class ModelBase(nn.Module):
                 optimizer.step()
                 if scheduler:
                     scheduler.step()
+                    wandb.log(
+                        {
+                            f"{self.model_name}/lr": scheduler.get_last_lr()[0],
+                            "epoch": epoch,
+                        }
+                    )
+
                 epoch_loss += loss.item()
 
             avg_loss = epoch_loss / len(train_loader)

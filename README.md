@@ -19,11 +19,9 @@ The script outputs several files for each example:
 
 ### Command-Line Arguments
 
-- `--model_class` : Model class name (e.g., `UNet`, `Model1`, `Swin`).
-- `--model_path`  : File path for the model weights.
+- `--model_classes` : List of model class name (e.g., `UNet`, `Model1`, `Swin`).
+- `--model_paths`  : File paths for the model weights af all modelss
 - `--num_examples` : Number of examples on which to run inference (default: 5).
-- `--backbone` : Backbone model size for `Swin` (options: `tiny`, `base`, `small`; default: `tiny`).
-- `--decoder` : Decoder type for `Swin` (options: `simple`, `deeplab`; default: `simple`).
 
 The device for inference is selected automatically (prioritizing CUDA, then MPS, then CPU).
 

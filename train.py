@@ -217,7 +217,7 @@ if __name__ == "__main__":
             batch_size=current_batch_size,
             num_workers=args.workers,
             grayscale=False,
-            resize=resize_dim,
+            size=resize_dim,
         )
 
         scheduler = None

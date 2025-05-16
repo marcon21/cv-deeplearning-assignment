@@ -14,11 +14,11 @@ def get_model_class(class_name):
         from models.unet import UNet
 
         return UNet
-    elif class_name == "Model1":
-        from models.model1 import Model1
+    elif class_name == "EfficientNet":
+        from models.efficientnet import EfficientNet
 
-        return Model1
-    # Add more models as needed
+        return EfficientNet
+    
     elif class_name == "Swin":
         from models.swin import SwinTransformer as SwinTransformer
 
@@ -169,8 +169,8 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_class", type=str, required=True, help="Model classes, e.g., UNet, Model1, Swin",
-        default=["UNet", "Model1", "Swin"], nargs="+" 
+        "--model_class", type=str, required=True, help="Model classes, e.g., UNet, EfficientNet, Swin",
+        default=["UNet", "EfficientNet", "Swin"], nargs="+" 
 
     )
     parser.add_argument(
@@ -196,18 +196,20 @@ def main():
 
     # Dynamically get model class
     for model, index in zip(args.model_class, range(len(args.model_class))):
-        if model not in ["UNet", "Model1", "Swin"]:
+        if model not in ["UNet", "EfficientNet", "Swin"]:
             raise ValueError(f"Unknown model class: {model}")
         ModelClass = get_model_class(model)
         if model == "UNet":
             model = ModelClass(
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
+
         elif model == "EfficientNet":
             _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(
                 num_classes=21,
             )
+            
         elif model == "Swin":
             _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(

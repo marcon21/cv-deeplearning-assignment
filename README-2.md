@@ -6,6 +6,22 @@ This repository provides scripts for training and evaluating deep learning model
 
 ---
 
+## Quick Inference Guide
+
+To quickly run inference on your own images using multiple models, use the following command:
+
+```bash
+python inference.py --model_class UNet EfficientNet Swin \
+  --model_paths model_saves/Unet.pth model_saves/EfficientNet.pth model_saves/Swin.pth \
+  --input_folder myimgs/
+```
+
+- Replace `myimgs/` with the path to your folder of images.
+- Make sure the model weights exist at the specified paths.
+- This will process **all images** in the folder using each model and save the results in `out/examples/<model_name>/`.
+
+---
+
 ## 1. Training Models (`train.py`)
 
 The `train.py` script allows you to train one or more segmentation models with customizable settings.
@@ -130,7 +146,3 @@ python inference.py --model_class UNet \
    ```bash
    python inference.py --model_class UNet --model_paths ./model_saves/unet_model.pth --num_examples 5
    ```
-
----
-
-For more details, see the code and comments in `train.py` and `inference.py`.

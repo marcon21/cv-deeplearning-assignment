@@ -6,12 +6,19 @@ __pycache__/
 # C extensions
 *.so
 VOC/
-out/
 # Wandb
 wandb/
 .vscode/
-model_saves/
 .DS_Store
+
+# out/
+# model_saves/
+
+!model_saves/Unet.pth
+!model_saves/Swin.pth
+!model_saves/EfficientNet.pth
+
+
 # Distribution / packaging
 .Python
 build/

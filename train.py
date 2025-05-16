@@ -8,10 +8,8 @@ import wandb
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 
 from models.unet import UNet
-from models.model1 import Model1
+from models.efficientnet import EfficientNet, compute_loss_effnet
 from models.swin import SwinTransformer, compute_loss_swin, get_scheduler
-
-# from models.model3 import Model3
 
 if __name__ == "__main__":
     import os
@@ -161,8 +159,10 @@ if __name__ == "__main__":
 
     model_classes = {
         "UNet": lambda: UNet(input_channels=3, output_channels=21, device=device),
-        "Model1": lambda: Model1(
-            input_height=256, input_width=256, output_dim=21, device=device
+        "EfficientNet": lambda: EfficientNet(
+            num_classes=21,
+            file_path=f"./model_saves/efficientnet_{args.backbone}.pth",
+            device=device,
         ),
         "Swin": lambda: SwinTransformer(
             num_classes=21,
@@ -201,7 +201,11 @@ if __name__ == "__main__":
                     f"Error loading weights for {model_key_name} from {current_weight_path}: {e}"
                 )
 
-        resize_dim = (224, 224) if model_key_name == "Swin" else (256, 256)
+        resize_dim = (
+            (224, 224)
+            if (model_key_name == "Swin" or model_key_name == "EfficientNet")
+            else (256, 256)
+        )
         print(f"Using resize dimensions: {resize_dim} for {model_key_name}")
 
         train_loader, test_loader, eval_loader = data.load_data(
@@ -226,32 +230,27 @@ if __name__ == "__main__":
                 raise ValueError(
                     "Swin Transformer requires at least two learning rates (for backbone and decoder). Provide using --learning_rates lr_backbone lr_decoder."
                 )
-            lr1 = args.learning_rates[0]
-            lr2 = args.learning_rates[1]
+            swin_lr_backbone = args.learning_rates[0]
+            swin_lr_decoder = args.learning_rates[1]
 
             if len(args.weight_decays) < 2:
                 raise ValueError(
                     "Swin Transformer requires at least two weight decay values (for backbone and decoder). Provide using --weight_decays wd_backbone wd_decoder."
                 )
-            wd1 = args.weight_decays[0]
-            wd2 = args.weight_decays[1]
-
-            if not hasattr(model, "backbone") or not hasattr(model, "decoder"):
-                raise AttributeError(
-                    f"Swin model {model_key_name} does not have 'backbone' or 'decoder' attributes required for optimizer setup."
-                )
+            swin_wd_backbone = args.weight_decays[0]
+            swin_wd_decoder = args.weight_decays[1]
 
             optimizer = optim.AdamW(
                 [
                     {
                         "params": model.backbone.parameters(),
-                        "lr": lr1,
-                        "weight_decay": wd1,
+                        "lr": swin_lr_backbone,
+                        "weight_decay": swin_wd_backbone,
                     },
                     {
                         "params": model.decoder.parameters(),
-                        "lr": lr2,
-                        "weight_decay": wd2,
+                        "lr": swin_lr_decoder,
+                        "weight_decay": swin_wd_decoder,
                     },
                 ]
             )
@@ -261,7 +260,45 @@ if __name__ == "__main__":
                 total_steps=current_epochs * len(train_loader),
             )
             print(
-                f"Optimizer for Swin: AdamW. LR_backbone: {lr1}, LR_decoder: {lr2}. WD_backbone: {wd1}, WD_decoder: {wd2}. Scheduler enabled."
+                f"Optimizer for Swin: AdamW. LR_backbone: {swin_lr_backbone}, LR_decoder: {swin_lr_decoder}. WD_backbone: {swin_wd_backbone}, WD_decoder: {swin_wd_decoder}. Scheduler enabled."
+            )
+
+        elif model_key_name == "EfficientNet":
+            if len(args.learning_rates) < 2:
+                raise ValueError(
+                    "EfficientNet (with backbone/decoder structure) requires at least two learning rates. Provide using --learning_rates lr_backbone lr_decoder."
+                )
+            eff_lr_backbone = args.learning_rates[0]
+            eff_lr_decoder = args.learning_rates[1]
+
+            if len(args.weight_decays) < 2:
+                raise ValueError(
+                    "EfficientNet (with backbone/decoder structure) requires at least two weight decay values. Provide using --weight_decays wd_backbone wd_decoder."
+                )
+            eff_wd_backbone = args.weight_decays[0]
+            eff_wd_decoder = args.weight_decays[1]
+
+            optimizer = optim.AdamW(
+                [
+                    {
+                        "params": model.backbone.parameters(),
+                        "lr": eff_lr_backbone,
+                        "weight_decay": eff_wd_backbone,
+                    },
+                    {
+                        "params": model.decoder.parameters(),
+                        "lr": eff_lr_decoder,
+                        "weight_decay": eff_wd_decoder,
+                    },
+                ]
+            )
+            scheduler = get_scheduler(
+                optimizer,
+                warmup_steps=int(current_epochs * len(train_loader) * 0.05),
+                total_steps=current_epochs * len(train_loader),
+            )
+            print(
+                f"Optimizer for EfficientNet: AdamW. LR_backbone: {eff_lr_backbone}, LR_decoder: {eff_lr_decoder}. WD_backbone: {eff_wd_backbone}, WD_decoder: {eff_wd_decoder}. Scheduler enabled."
             )
         else:
             if not args.learning_rates:
@@ -272,6 +309,8 @@ if __name__ == "__main__":
 
         if model_key_name == "Swin":
             loss_fn = compute_loss_swin
+        elif model_key_name == "EfficientNet":
+            loss_fn = compute_loss_effnet
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=255)
         print(
@@ -284,11 +323,6 @@ if __name__ == "__main__":
             f"Starting training for {display_model_name} on {device} for {current_epochs} epochs..."
         )
 
-        if not hasattr(model, "train_model"):
-            raise AttributeError(
-                f"Model {model_key_name} does not have a 'train_model' method."
-            )
-
         model.train_model(
             train_loader=train_loader,
             test_loader=test_loader,
@@ -299,12 +333,7 @@ if __name__ == "__main__":
             scheduler=scheduler,
         )
 
-        if not hasattr(model, "save"):
-            print(
-                f"Warning: Model {model_key_name} does not have a 'save' method. Cannot save model."
-            )
-        else:
-            print(f"Saving model {display_model_name}...")
-            model.save()
+        print(f"Saving model {display_model_name}...")
+        model.save()
 
     print("\nAll specified models have been trained.")

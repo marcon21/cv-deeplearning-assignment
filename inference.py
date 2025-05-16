@@ -14,11 +14,11 @@ def get_model_class(class_name):
         from models.unet import UNet
 
         return UNet
-    elif class_name == "Model1":
-        from models.model1 import Model1
+    elif class_name == "EfficientNet":
+        from models.efficientnet import EfficientNet
 
-        return Model1
-    # Add more models as needed
+        return EfficientNet
+    
     elif class_name == "Swin":
         # from models.swin import SwinTransformer as SwinTransformer
         return SwinTransformer
@@ -172,8 +172,8 @@ def main():
         "--model_class",
         type=str,
         required=True,
-        help="Model classes, e.g., UNet, Model1, Swin",
-        default=["UNet", "Model1", "Swin"],
+        help="Model classes, e.g., UNet, EfficientNet, Swin",
+        default=["UNet", "EfficientNet", "Swin"],
         nargs="+",
     )
     parser.add_argument(
@@ -202,7 +202,7 @@ def main():
 
     # Dynamically get model class
     for model_name, index in zip(args.model_class, range(len(args.model_class))):
-        if model_name not in ["UNet", "Model1", "Swin"]:
+        if model_name not in ["UNet", "EfficientNet", "Swin"]:
             raise ValueError(f"Unknown model class: {model_name}")
         ModelClass = get_model_class(model_name)
         model_instance = None  # Initialize model_instance
@@ -210,14 +210,11 @@ def main():
             model_instance = ModelClass(
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
-        elif model_name == "Model1":
-            # Example: Model1(input_height, input_width, output_dim, ...)
-            model_instance = ModelClass(
-                input_height=256,
-                input_width=256,
-                output_dim=21,
+        elif model_name == "EfficientNet":
+            model = ModelClass(
+                num_classes=21,
+                file_path=None,
                 device=device,
-                use_wandb=False,
             )
         elif model_name == "Swin":
             # Example: Model2(num_classes, decoder, model_name, ...)

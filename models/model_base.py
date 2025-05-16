@@ -1,3 +1,4 @@
+import os
 from torch import nn
 from torch.nn import functional as F
 import torch
@@ -8,6 +9,7 @@ from tqdm import tqdm
 import os
 import numpy as np
 from torch.utils.data import Subset, DataLoader
+
 
 
 class ModelBase(nn.Module):
@@ -52,6 +54,17 @@ class ModelBase(nn.Module):
         self.to(self.device)
 
         self.model_name = self.__class__.__name__
+        # parent directory and folder model_saves
+        if file_path is None:
+            # Use the current file's directory to create a default path
+            default_dir = os.path.dirname(os.path.abspath(__file__))
+            self.file_path = os.path.join(
+                os.path.dirname(default_dir), "model_saves"
+            )
+        else:
+            self.file_path = file_path
+        os.makedirs(self.file_path, exist_ok=True)
+
 
         # Initialize wandb if enabled
         if self.use_wandb:
@@ -76,7 +89,21 @@ class ModelBase(nn.Module):
         if file_path is None:
             file_path = self.file_path
 
-        torch.save(self.state_dict(), file_path)
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        try:
+            torch.save(self.state_dict(), file_path)
+        except Exception as e:
+            print(f"Error saving model to {file_path}: {e}")
+            # Attempt to save to a fallback location
+            fallback_path = os.path.join(self.file_path, "fallback_model.pth")
+            try:
+                torch.save(self.state_dict(), fallback_path)
+                print(f"Model saved to fallback location: {fallback_path}")
+            except Exception as e:
+                print(f"Error saving model to fallback location {fallback_path}: {e}")
+                print("Model saving failed. Check your file path and permissions.")
 
     def load(self, file_path: str = None):
         """
@@ -137,6 +164,8 @@ class ModelBase(nn.Module):
         epochs: int = 1,
         optimizer: torch.optim.Optimizer = None,
         loss_fn: callable = None,
+        scheduler: callable = None,
+        clip_grad: bool = True,
     ) -> None:
         """
         Trains the model for a specified number of epochs using the provided data loaders.
@@ -175,6 +204,15 @@ class ModelBase(nn.Module):
                 loss = loss_fn(outputs, targets)
                 loss.backward()
                 optimizer.step()
+                if scheduler:
+                    scheduler.step()
+                    wandb.log(
+                        {
+                            f"{self.model_name}/lr": scheduler.get_last_lr()[0],
+                            "epoch": epoch,
+                        }
+                    )
+
                 epoch_loss += loss.item()
 
             avg_loss = epoch_loss / len(train_loader)
@@ -187,34 +225,28 @@ class ModelBase(nn.Module):
             subset_size = 100  # You can adjust this value
             validate_every = 5
             if test_loader is not None:
-                if (epoch + 1) % validate_every == 0 or epoch == epochs - 1:
-                    # Full validation
-                    test_loss, test_accuracy, f1 = self.evaluate_model(
-                        test_loader, loss_fn
+                test_loss, test_accuracy, f1, miou = self.evaluate_model(test_loader, loss_fn)
+                if self.use_wandb:
+                    wandb.log(
+                        {
+                            f"{self.model_name}/test_loss": test_loss,
+                            f"{self.model_name}/test_accuracy": test_accuracy,
+                            f"{self.model_name}/f1_score": f1,
+                            f"{self.model_name}/miou": miou,
+                            "epoch": epoch,
+                        }
                     )
-                    if self.use_wandb:
-                        wandb.log(
-                            {
-                                f"{self.model_name}/test_loss": test_loss,
-                                f"{self.model_name}/test_accuracy": test_accuracy,
-                                f"{self.model_name}/f1_score": f1,
-                                "epoch": epoch,
-                            }
-                        )
-                    self.test_history.append(test_loss)
-                    print(f" | Full Test Loss: {test_loss:.4f}", end="")
-                else:
-                    # Subset validation
-                    subset_loader = self.get_subset_loader(test_loader, subset_size)
-                    test_loss, test_accuracy, f1 = self.evaluate_model(
-                        subset_loader, loss_fn
-                    )
-                    print(f" | Subset Test Loss: {test_loss:.4f}", end="")
+                self.test_history.append(test_loss)
+                print(f" | Test Loss: {test_loss:.4f}", end="")
+            
+            # save model every epoch
+            if self.file_path is not None:
+                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
 
-            print()
-
+                
+            FREQUENCY_SAVE = 10
             # Save model every 10 epochs
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % FREQUENCY_SAVE == 0:
                 save_path = self.file_path
                 if save_path is None:
                     save_path = f"{self.model_name.lower()}_epoch{epoch+1}.pth"
@@ -225,13 +257,14 @@ class ModelBase(nn.Module):
                 self.save(save_path)
 
         if eval_loader is not None:
-            eval_loss, eval_accuracy, f1 = self.evaluate_model(eval_loader, loss_fn)
+            eval_loss, eval_accuracy, f1, miou = self.evaluate_model(eval_loader, loss_fn)
             if self.use_wandb:
                 wandb.log(
                     {
                         f"{self.model_name}/eval_loss": eval_loss,
                         f"{self.model_name}/eval_accuracy": eval_accuracy,
                         f"{self.model_name}/eval_f1_score": f1,
+                        f"{self.model_name}/eval_miou": miou,
                         "epoch": epochs - 1,
                     }
                 )
@@ -240,10 +273,25 @@ class ModelBase(nn.Module):
                 f"Eval Loss: {eval_loss:.4f}",
                 f" | Eval Accuracy: {eval_accuracy:.4f}",
                 f" | Eval F1 Score: {f1:.4f}",
+                f" | Eval mIoU: {miou:.4f}",
             )
 
         self.eval()
         print("Training complete.")
+
+    @staticmethod
+    def _compute_miou(pred, target, num_classes=21):
+        pred = pred.reshape(-1)
+        target = target.reshape(-1)
+        intersection = torch.zeros(num_classes).to(pred.device)
+        union = torch.zeros(num_classes).to(pred.device)
+
+        for i in range(num_classes):
+            intersection[i] = ((pred == i) & (target == i)).sum()
+            union[i] = ((pred == i) | (target == i)).sum()
+
+        miou = (intersection / (union + 1e-6)).mean().item()
+        return miou
 
     def evaluate_model(
         self, data_loader, loss_fn: callable = None
@@ -258,6 +306,7 @@ class ModelBase(nn.Module):
             float: The average loss over the evaluation dataset.
             float: The accuracy of the model on the evaluation dataset.
             float: The F1 score of the model on the evaluation dataset.
+            float : The mean Intersection over Union (mIoU) of the model on the evaluation dataset.
         """
 
         if loss_fn is None:
@@ -269,6 +318,7 @@ class ModelBase(nn.Module):
         total = 0
         all_preds = []
         all_labels = []
+        all_miou = []
 
         with torch.no_grad():
             for inputs, targets in data_loader:
@@ -285,8 +335,12 @@ class ModelBase(nn.Module):
                 all_preds.extend(preds.cpu().numpy().flatten())
                 all_labels.extend(targets.cpu().numpy().flatten())
 
+                miou = self._compute_miou(preds, targets)
+                all_miou.append(miou)
+
         accuracy = correct / total if total > 0 else 0
         f1 = f1_score(all_labels, all_preds, average="macro") if total > 0 else 0
+        miou = sum(all_miou) / len(all_miou) if all_miou else 0
 
         avg_loss = total_loss / len(data_loader)
-        return avg_loss, accuracy, f1
+        return avg_loss, accuracy, f1, miou

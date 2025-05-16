@@ -34,10 +34,15 @@ def load_data(
     num_workers=4,
     grayscale=False,
     size=(256, 256),
+    transform=None,
 ):
     # Ensure the ratios sum to 1
     if not np.isclose(train + test + eval, 1.0):
         raise ValueError("The sum of train, test, and eval ratios must be 1.0")
+
+
+    
+    
 
     # Enhanced transforms with normalization
     transform = transforms.Compose(

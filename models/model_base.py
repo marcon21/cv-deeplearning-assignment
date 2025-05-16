@@ -223,12 +223,6 @@ class ModelBase(nn.Module):
 
             print()  # Newline after epoch status
 
-            # Save model every epoch
-            epoch_save_path = os.path.join(
-                self.file_path, f"{self.model_name}_epoch_{epoch+1}.pth"
-            )
-            self.save(epoch_save_path)
-
             FREQUENCY_SAVE = 10
             # Save a specific checkpoint every FREQUENCY_SAVE epochs
             if (epoch + 1) % FREQUENCY_SAVE == 0:

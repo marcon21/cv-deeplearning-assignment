@@ -65,3 +65,9 @@ def compute_loss_effnet(pred, target):
         pred = F.interpolate(pred, size=target.shape[-2:], mode="bilinear", align_corners=False)
 
     return F.cross_entropy(pred, target, ignore_index=255)
+
+def save(self):
+    import os
+    os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+    torch.save(self.state_dict(), self.file_path)
+    print(f"EfficientNet model saved to {self.file_path}")

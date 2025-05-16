@@ -207,7 +207,7 @@ def main():
         elif args.model_class == "EfficientNet":
             model = ModelClass(
                 num_classes=21,
-                file_path=args.model_path,
+                file_path=None,
                 device=device,
             )
         

@@ -18,7 +18,7 @@ def get_model_class(class_name):
         from models.efficientnet import EfficientNet
 
         return EfficientNet
-    
+
     elif class_name == "Swin":
         # from models.swin import SwinTransformer as SwinTransformer
         return SwinTransformer

@@ -11,6 +11,7 @@ from models.unet import UNet
 from models.efficientnet import EfficientNet, compute_loss_effnet
 from models.swin import SwinTransformer, compute_loss_swin, get_scheduler
 
+
 if __name__ == "__main__":
     import os
 
@@ -135,7 +136,7 @@ if __name__ == "__main__":
                 f"Warning: Fewer weight paths ({len(weights_to_load)}) provided than models ({num_models}). Remaining models will not have weights loaded."
             )
             weights_to_load.extend([None] * (num_models - len(weights_to_load)))
-        else:  # len(weights_to_load) > num_models
+        else:
             raise ValueError(
                 "Cannot provide more weight paths than the number of models."
             )

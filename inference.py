@@ -204,7 +204,8 @@ def main():
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
 
-        elif args.model_class == "EfficientNet":
+        elif model == "EfficientNet":
+            _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(
                 num_classes=21,
                 file_path=None,

@@ -68,8 +68,6 @@ class EfficientNet(ModelBase):
             print(f"Model saved to fallback location: {fallback_path}")
 
 
-
-
 def compute_loss_effnet(pred, target):
     if isinstance(target, list):
         target = torch.stack(target)

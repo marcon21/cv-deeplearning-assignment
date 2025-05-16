@@ -54,17 +54,19 @@ class EfficientNet(ModelBase):
         x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
         return x
     
-    def save(self):
+    def save(self, path=None):
         import os
+        save_path = path if path is not None else self.file_path
         try:
-            os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
-            torch.save(self.state_dict(), self.file_path)
-            print(f"Model saved to {self.file_path}")
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            torch.save(self.state_dict(), save_path)
+            print(f"Model saved to {save_path}")
         except Exception as e:
-            print(f"Error saving model to {self.file_path}: {e}")
-            fallback_path = self.file_path.replace(".pth", "_fallback.pth")
+            print(f"Error saving model to {save_path}: {e}")
+            fallback_path = save_path.replace(".pth", "_fallback.pth")
             torch.save(self.state_dict(), fallback_path)
             print(f"Model saved to fallback location: {fallback_path}")
+
 
 
 

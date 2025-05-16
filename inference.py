@@ -98,6 +98,25 @@ def get_voc_palette(num_classes=21):
     return palette
 
 
+def tensor_to_pil(tensor, is_mask=False):
+    array = tensor.cpu().numpy()
+    if is_mask:
+        # VOC masks: single channel, map 255 to 0 for visualization
+        array = np.where(array == 255, 0, array)
+        array = array.astype(np.uint8)
+        img = Image.fromarray(array, mode="P")
+        img.putpalette(get_voc_palette())
+    else:
+        # Input: (C, H, W) -> (H, W, C), unnormalize
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        array = array.transpose(1, 2, 0)
+        array = array * std + mean
+        array = np.clip(array * 255, 0, 255).astype(np.uint8)
+        img = Image.fromarray(array)
+    return img
+
+
 def save_image(tensor, path, is_mask=False):
     array = tensor.cpu().numpy()
     if is_mask:
@@ -117,8 +136,8 @@ def save_image(tensor, path, is_mask=False):
     img.save(path)
 
 
-def concat_and_save_images(input_path, gt_path, pred_path, out_path):
-    imgs = [Image.open(p) for p in [input_path, gt_path, pred_path]]
+def concat_and_save_images_from_pil(input_img, gt_img, pred_img, out_path):
+    imgs = [input_img, gt_img, pred_img]
     # Ensure all images are RGB for consistency
     imgs = [img.convert("RGB") for img in imgs]
     widths, heights = zip(*(img.size for img in imgs))
@@ -208,7 +227,11 @@ def main():
         model_instance = None  # Initialize model_instance
         if model_name == "UNet":
             model_instance = ModelClass(
-                input_channels=3, output_channels=21, device=device, use_wandb=False
+                input_channels=3,
+                output_channels=21,
+                device=device,
+                use_wandb=False,
+                file_path=None,
             )
         elif model_name == "EfficientNet":
             model = ModelClass(
@@ -244,18 +267,17 @@ def main():
                 outputs = model_instance(images)
                 preds = torch.argmax(outputs, dim=1)
 
-            input_path = os.path.join(out_dir, f"{count}_input.png")
-            gt_path = os.path.join(out_dir, f"{count}_gt.png")
-            pred_path = os.path.join(out_dir, f"{count}_pred.png")
-            save_image(images[0], input_path)
-            save_image(masks[0], gt_path, is_mask=True)
-            save_image(preds[0], pred_path, is_mask=True)
+            # Create paths for intermediate images, but don't save them individually
+            # These paths are needed for concat_and_save_images if it reads from disk
+            # If concat_and_save_images can take tensors/PIL Images, this can be further optimized
+            input_pil = tensor_to_pil(images[0])
+            gt_pil = tensor_to_pil(masks[0], is_mask=True)
+            pred_pil = tensor_to_pil(preds[0], is_mask=True)
 
             concat_path = os.path.join(out_dir, f"{count}_concat.png")
-            concat_and_save_images(input_path, gt_path, pred_path, concat_path)
+            # Modify concat_and_save_images to accept PIL Images directly
+            concat_and_save_images_from_pil(input_pil, gt_pil, pred_pil, concat_path)
 
-            overlapped_path = os.path.join(out_dir, f"{count}_overlapped.png")
-            save_overlapped_images(input_path, gt_path, pred_path, overlapped_path)
             count += 1
         print(f"Saved {count} examples for {model_name} to {out_dir}")
 

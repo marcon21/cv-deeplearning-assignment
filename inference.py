@@ -153,7 +153,7 @@ def main():
     )
 
     # Load data (use test set)
-    _, test_loader, _ = data.load_data(batch_size=1)
+    _, test_loader, _ = data.load_data(batch_size=1, size=(256, 256))
 
     # Dynamically get model class
     ModelClass = get_model_class(args.model_class)

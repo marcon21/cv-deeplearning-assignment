@@ -204,12 +204,13 @@ def main():
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
 
-        elif model == "EfficientNet":
-            _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
+        elif args.model_class == "EfficientNet":
             model = ModelClass(
                 num_classes=21,
+                file_path=args.model_path,
+                device=device,
             )
-            
+        
         elif model == "Swin":
             _, test_loader, _ = data.load_data(batch_size=1, resize=(224, 224))
             model = ModelClass(

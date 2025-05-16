@@ -12,11 +12,11 @@ wandb/
 .DS_Store
 
 # out/
-# model_saves/
+model_saves/
 
-!model_saves/Unet.pth
-!model_saves/Swin.pth
-!model_saves/EfficientNet.pth
+# !model_saves/Unet.pth
+# !model_saves/Swin.pth
+# !model_saves/EfficientNet.pth
 
 
 # Distribution / packaging

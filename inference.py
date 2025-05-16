@@ -20,8 +20,7 @@ def get_model_class(class_name):
         return Model1
     # Add more models as needed
     elif class_name == "Swin":
-        from models.swin import SwinTransformer as SwinTransformer
-
+        # from models.swin import SwinTransformer as SwinTransformer
         return SwinTransformer
     else:
         raise ValueError(f"Unknown model class: {class_name}")
@@ -132,6 +131,7 @@ def concat_and_save_images(input_path, gt_path, pred_path, out_path):
         x_offset += img.width
     new_img.save(out_path)
 
+
 def save_overlapped_images(input_path, gt_path, pred_path, out_path):
     input_img = Image.open(input_path).convert("RGBA")
     gt_img = Image.open(gt_path).convert("L")
@@ -140,8 +140,8 @@ def save_overlapped_images(input_path, gt_path, pred_path, out_path):
     overlapped_img = input_img.copy()
     pixels = overlapped_img.load()
     input_pixels = input_img.load()
-    alpha_gt = 0.5  
-    alpha_pred = 0.5  
+    alpha_gt = 0.5
+    alpha_pred = 0.5
 
     def blend(background, overlay, alpha):
         return tuple(
@@ -169,12 +169,19 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_class", type=str, required=True, help="Model classes, e.g., UNet, Model1, Swin",
-        default=["UNet", "Model1", "Swin"], nargs="+" 
-
+        "--model_class",
+        type=str,
+        required=True,
+        help="Model classes, e.g., UNet, Model1, Swin",
+        default=["UNet", "Model1", "Swin"],
+        nargs="+",
     )
     parser.add_argument(
-        "--model_paths", type=str, required=True, help="Paths to model weights", nargs="+"
+        "--model_paths",
+        type=str,
+        required=True,
+        help="Paths to model weights",
+        nargs="+",
     )
     parser.add_argument(
         "--num_examples",
@@ -194,26 +201,27 @@ def main():
     _, test_loader, _ = data.load_data(batch_size=1, size=(256, 256))
 
     # Dynamically get model class
-    for model, index in zip(args.model_class, range(len(args.model_class))):
-        if model not in ["UNet", "Model1", "Swin"]:
-            raise ValueError(f"Unknown model class: {model}")
-        ModelClass = get_model_class(model)
-        if model == "UNet":
-            model = ModelClass(
+    for model_name, index in zip(args.model_class, range(len(args.model_class))):
+        if model_name not in ["UNet", "Model1", "Swin"]:
+            raise ValueError(f"Unknown model class: {model_name}")
+        ModelClass = get_model_class(model_name)
+        model_instance = None  # Initialize model_instance
+        if model_name == "UNet":
+            model_instance = ModelClass(
                 input_channels=3, output_channels=21, device=device, use_wandb=False
             )
-        elif model == "Model1":
+        elif model_name == "Model1":
             # Example: Model1(input_height, input_width, output_dim, ...)
-            model = ModelClass(
+            model_instance = ModelClass(
                 input_height=256,
                 input_width=256,
                 output_dim=21,
                 device=device,
                 use_wandb=False,
             )
-        elif model == "Swin":
+        elif model_name == "Swin":
             # Example: Model2(num_classes, decoder, model_name, ...)
-            model = ModelClass(
+            model_instance = ModelClass(
                 num_classes=21,
                 decoder="aspp",
                 model_name="microsoft/swin-small-patch4-window7-224",
@@ -221,38 +229,38 @@ def main():
                 device=device,
                 use_wandb=False,
             )
-        model.load(args.model_paths[index])
-        model.to(device)
-        model.eval()
+        model_instance.load(args.model_paths[index])
+        model_instance.to(device)
+        model_instance.eval()
 
-        # Prepare output directory
-        out_dir = os.path.join("out", "examples")
+        out_dir = os.path.join(
+            "out", "examples", model_name
+        )  # Modified to include model_name in out_dir
         os.makedirs(out_dir, exist_ok=True)
 
-        # Run inference on num_examples
         count = 0
         for images, masks in test_loader:
             if count >= args.num_examples:
                 break
             images = images.to(device)
             with torch.no_grad():
-                outputs = model(images)
+                outputs = model_instance(images)
                 preds = torch.argmax(outputs, dim=1)
-            # Save input, ground truth, prediction
+
             input_path = os.path.join(out_dir, f"{count}_input.png")
             gt_path = os.path.join(out_dir, f"{count}_gt.png")
             pred_path = os.path.join(out_dir, f"{count}_pred.png")
             save_image(images[0], input_path)
             save_image(masks[0], gt_path, is_mask=True)
             save_image(preds[0], pred_path, is_mask=True)
-            # Concatenate and save
+
             concat_path = os.path.join(out_dir, f"{count}_concat.png")
             concat_and_save_images(input_path, gt_path, pred_path, concat_path)
-            count += 1
-            # Save overlapped image
+
             overlapped_path = os.path.join(out_dir, f"{count}_overlapped.png")
             save_overlapped_images(input_path, gt_path, pred_path, overlapped_path)
-        print(f"Saved {count} examples to {out_dir}")
+            count += 1
+        print(f"Saved {count} examples for {model_name} to {out_dir}")
 
 
 if __name__ == "__main__":

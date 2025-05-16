@@ -40,10 +40,6 @@ def load_data(
     if not np.isclose(train + test + eval, 1.0):
         raise ValueError("The sum of train, test, and eval ratios must be 1.0")
 
-
-    
-    
-
     # Enhanced transforms with normalization
     transform = transforms.Compose(
         [
@@ -101,21 +97,21 @@ def load_data(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        collate_fn=collate_fn,  # Use custom collate function
+        collate_fn=collate_fn,
     )
     test_loader = DataLoader(
         test_subset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        collate_fn=collate_fn,  # Use custom collate function
+        collate_fn=collate_fn,
     )
     eval_loader = DataLoader(
         eval_subset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        collate_fn=collate_fn,  # Use custom collate function
+        collate_fn=collate_fn,
     )
 
     return train_loader, test_loader, eval_loader

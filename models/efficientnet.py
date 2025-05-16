@@ -53,6 +53,19 @@ class EfficientNet(ModelBase):
         x = self.decoder(x)   # [B, num_classes, H/2, W/2] or more
         x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
         return x
+    
+    def save(self):
+        import os
+        try:
+            os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+            torch.save(self.state_dict(), self.file_path)
+            print(f"Model saved to {self.file_path}")
+        except Exception as e:
+            print(f"Error saving model to {self.file_path}: {e}")
+            fallback_path = self.file_path.replace(".pth", "_fallback.pth")
+            torch.save(self.state_dict(), fallback_path)
+            print(f"Model saved to fallback location: {fallback_path}")
+
 
 
 def compute_loss_effnet(pred, target):
@@ -66,8 +79,3 @@ def compute_loss_effnet(pred, target):
 
     return F.cross_entropy(pred, target, ignore_index=255)
 
-def save(self):
-    import os
-    os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
-    torch.save(self.state_dict(), self.file_path)
-    print(f"EfficientNet model saved to {self.file_path}")

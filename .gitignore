@@ -11,7 +11,7 @@ out/
 wandb/
 .vscode/
 model_saves/
-
+.DS_Store
 # Distribution / packaging
 .Python
 build/

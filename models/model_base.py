@@ -2,11 +2,13 @@ import os
 from torch import nn
 from torch.nn import functional as F
 import torch
-from typing import Union
+from typing import Union, Tuple
 from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
-
+import os
+import numpy as np
+from torch.utils.data import Subset, DataLoader
 
 
 class ModelBase(nn.Module):
@@ -19,16 +21,17 @@ class ModelBase(nn.Module):
         """
         Initializes the model instance.
         Args:
-            file_path (str, optional): Path to a file for loading or saving model data. Defaults to None.
-            device (str or torch.device, optional): The device to run the model on ('cuda', 'mps', or 'cpu').
-                If not specified, automatically selects 'cuda' if available, otherwise 'mps', otherwise 'cpu'.
-            use_wandb (bool, optional): Whether to use wandb for logging. Defaults to True.
+            file_path: Path to a directory for saving model data. Defaults to 'model_saves'.
+            device: The device to run the model on ('cuda', 'mps', or 'cpu').
+                If not specified, automatically selects 'cuda' if available, then 'mps', then 'cpu'.
+            use_wandb: Whether to use wandb for logging. Defaults to True.
         Attributes:
-            file_path (str or None): Stores the provided file path.
-            train_history (list): Keeps track of training history.
-            eval_history (list): Keeps track of evaluation history.
-            device (str): The device selected for computation.
-            use_wandb (bool): Whether to use wandb for logging.
+            file_path: Stores the provided file path for saving models.
+            train_history: Keeps track of training loss.
+            eval_history: Keeps track of evaluation loss.
+            test_history: Keeps track of test loss.
+            device: The device selected for computation.
+            use_wandb: Whether to use wandb for logging.
         """
 
         super().__init__()
@@ -51,19 +54,13 @@ class ModelBase(nn.Module):
         self.to(self.device)
 
         self.model_name = self.__class__.__name__
-        # parent directory and folder model_saves
         if file_path is None:
-            # Use the current file's directory to create a default path
             default_dir = os.path.dirname(os.path.abspath(__file__))
-            self.file_path = os.path.join(
-                os.path.dirname(default_dir), "model_saves"
-            )
+            self.file_path = os.path.join(os.path.dirname(default_dir), "model_saves")
         else:
             self.file_path = file_path
         os.makedirs(self.file_path, exist_ok=True)
 
-
-        # Initialize wandb if enabled
         if self.use_wandb:
             wandb.init(
                 project="cv-deeplearning-assignment",
@@ -77,23 +74,20 @@ class ModelBase(nn.Module):
         """
         Saves the model's state dictionary to the specified file path.
         Args:
-            file_path (str, optional): The path where the model state will be saved.
-                If None, uses the instance's default file_path attribute.
-        Returns:
-            None
+            file_path: The path where the model state will be saved.
+                If None, uses a default name within the instance's `file_path` directory.
         """
 
         if file_path is None:
-            file_path = self.file_path
+            # Default to saving in the designated model directory with model name
+            file_path = os.path.join(self.file_path, f"{self.model_name}_default.pth")
 
-        # Ensure the directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         try:
             torch.save(self.state_dict(), file_path)
         except Exception as e:
             print(f"Error saving model to {file_path}: {e}")
-            # Attempt to save to a fallback location
             fallback_path = os.path.join(self.file_path, "fallback_model.pth")
             try:
                 torch.save(self.state_dict(), fallback_path)
@@ -106,26 +100,19 @@ class ModelBase(nn.Module):
         """
         Loads the model's state dictionary from a file and sets the model to evaluation mode.
         Args:
-            file_path (str, optional): Path to the file containing the saved state dictionary.
-                If None, uses the default file path stored in self.file_path.
-        Returns:
-            None
+            file_path: Path to the file containing the saved state dictionary.
+                If None, attempts to load from a default path in `self.file_path`.
         """
 
         if file_path is None:
-            file_path = self.file_path
+            file_path = os.path.join(self.file_path, f"{self.model_name}_default.pth")
 
-        # Ensure compatibility with device
         state_dict = torch.load(file_path, map_location=self.device, weights_only=True)
         self.load_state_dict(state_dict)
         self.eval()
 
     def plot_train_history(self):
-        """
-        Plots the training history of the model.
-        Returns:
-            None
-        """
+        """Plots the training loss history of the model."""
         import matplotlib.pyplot as plt
 
         plt.plot(self.train_history, label="Train Loss")
@@ -135,28 +122,46 @@ class ModelBase(nn.Module):
         plt.legend()
         plt.show()
 
+    def get_subset_loader(self, data_loader, subset_size):
+        """
+        Returns a DataLoader for a random subset of the given data_loader's dataset.
+        Args:
+            data_loader: The original DataLoader.
+            subset_size: The desired size of the subset.
+        """
+        dataset = data_loader.dataset
+        total_size = len(dataset)
+        indices = np.random.choice(
+            total_size, min(subset_size, total_size), replace=False
+        )
+        return DataLoader(
+            Subset(dataset, indices),
+            batch_size=data_loader.batch_size,
+            shuffle=False,
+            num_workers=getattr(data_loader, "num_workers", 0),
+            collate_fn=getattr(data_loader, "collate_fn", None),
+        )
+
     def train_model(
         self,
-        train_loader,  # DataLoader for training data
+        train_loader,
         test_loader=None,
         eval_loader=None,
         epochs: int = 1,
         optimizer: torch.optim.Optimizer = None,
         loss_fn: callable = None,
         scheduler: callable = None,
-        clip_grad: bool = True,
     ) -> None:
         """
-        Trains the model for a specified number of epochs using the provided data loaders.
+        Trains the model for a specified number of epochs.
         Args:
-            train_loader (DataLoader): DataLoader for training data.
-            test_loader (DataLoader, optional): DataLoader for validation data. Defaults to None.
-            eval_loader (DataLoader, optional): DataLoader for evaluation data. Defaults to None.
-            epochs (int, optional): Number of training epochs. Defaults to 1.
-            optimizer (torch.optim.Optimizer, optional): Optimizer to use for training. If None, Adam optimizer is used. Defaults to None.
-            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
-        Returns:
-            None
+            train_loader: DataLoader for training data.
+            test_loader: DataLoader for validation data (optional).
+            eval_loader: DataLoader for evaluation data (optional).
+            epochs: Number of training epochs.
+            optimizer: Optimizer to use. If None, Adam optimizer is used.
+            loss_fn: Loss function to use. If None, CrossEntropyLoss is used.
+            scheduler: Learning rate scheduler (optional).
         """
 
         if optimizer is None:
@@ -174,9 +179,7 @@ class ModelBase(nn.Module):
             ):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
-                targets = (
-                    targets.long()
-                )  # Ensure targets are of type Long for CrossEntropyLoss
+                targets = targets.long()
 
                 optimizer.zero_grad()
                 outputs = self(inputs)
@@ -200,8 +203,11 @@ class ModelBase(nn.Module):
                 wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
+            # Validation logic
             if test_loader is not None:
-                test_loss, test_accuracy, f1, miou = self.evaluate_model(test_loader, loss_fn)
+                test_loss, test_accuracy, f1, miou = self.evaluate_model(
+                    test_loader, loss_fn
+                )
                 if self.use_wandb:
                     wandb.log(
                         {
@@ -214,26 +220,30 @@ class ModelBase(nn.Module):
                     )
                 self.test_history.append(test_loss)
                 print(f" | Test Loss: {test_loss:.4f}", end="")
-            # save model every epoch
-            if self.file_path is not None:
-                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
+
+            print()  # Newline after epoch status
 
             # Save model every epoch
-            try:
-                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
-            except Exception as e:
-                print(f"Error saving model: {e}")
-                # Attempt to save to a fallback location
-                fallback_path = os.path.join(self.file_path, f"fallback_{self.model_name}_epoch_{epoch}.pth")
-                try:
-                    self.save(fallback_path)
-                    print(f"Model saved to fallback location: {fallback_path}")
-                except Exception as e:
-                    print(f"Error saving model to fallback location: {e}")
-            print()
+            epoch_save_path = os.path.join(
+                self.file_path, f"{self.model_name}_epoch_{epoch+1}.pth"
+            )
+            self.save(epoch_save_path)
+
+            FREQUENCY_SAVE = 10
+            # Save a specific checkpoint every FREQUENCY_SAVE epochs
+            if (epoch + 1) % FREQUENCY_SAVE == 0:
+                checkpoint_save_path = os.path.join(
+                    self.file_path, f"{self.model_name}_checkpoint_epoch_{epoch+1}.pth"
+                )
+                self.save(checkpoint_save_path)
+                print(
+                    f"Saved checkpoint model to {checkpoint_save_path} at epoch {epoch+1}"
+                )
 
         if eval_loader is not None:
-            eval_loss, eval_accuracy, f1, miou = self.evaluate_model(eval_loader, loss_fn)
+            eval_loss, eval_accuracy, f1, miou = self.evaluate_model(
+                eval_loader, loss_fn
+            )
             if self.use_wandb:
                 wandb.log(
                     {
@@ -271,18 +281,15 @@ class ModelBase(nn.Module):
 
     def evaluate_model(
         self, data_loader, loss_fn: callable = None
-    ) -> tuple[float, float, float]:
+    ) -> Tuple[float, float, float, float]:
         """
         Evaluates the model on the provided data loader.
         Args:
-            data_loader (DataLoader): DataLoader for evaluation data.
-            loss_fn (callable, optional): Loss function to use. If None, CrossEntropyLoss is used. Defaults to None.
+            data_loader: DataLoader for evaluation data.
+            loss_fn: Loss function to use. If None, CrossEntropyLoss is used.
 
         Returns:
-            float: The average loss over the evaluation dataset.
-            float: The accuracy of the model on the evaluation dataset.
-            float: The F1 score of the model on the evaluation dataset.
-            float : The mean Intersection over Union (mIoU) of the model on the evaluation dataset.
+            Average loss, accuracy, F1 score, and mIoU.
         """
 
         if loss_fn is None:

@@ -38,6 +38,13 @@ if __name__ == "__main__":
         help="Device to use: auto, cpu, cuda, or mps (default: auto)",
     )
     parser.add_argument(
+        "--load_weights",
+        type=str,
+        nargs="*",
+        default=None,
+        help="List of paths to model weights to load before training (in order of models).",
+    )
+    parser.add_argument(
         "--backbone",
         type=str,
         default="tiny",
@@ -163,6 +170,16 @@ if __name__ == "__main__":
             resize= (224, 224) if model.model_name == "Swin" else (256, 256),
         )
 
+    # Load weights if provided
+    if args.load_weights is not None:
+        if len(args.load_weights) > len(models):
+            raise ValueError("More weight paths provided than models.")
+        for i, weight_path in enumerate(args.load_weights):
+            if weight_path and weight_path.lower() != "none":
+                print(f"Loading weights for {models[i].model_name} from {weight_path}")
+                models[i].load(weight_path)
+
+    for model in models:
         print(f"Training {model.model_name}...")
         if model.model_name == "SwinTransformer":
             lr1 = args.learning_rates[0]
@@ -186,14 +203,14 @@ if __name__ == "__main__":
                     ])
             scheduler = get_scheduler(optimizer, warmup_steps=int(run_params["epochs"] * len(train_loader)*0.05), total_steps=run_params["epochs"] * len(train_loader))
             print(f"Using optimizer: {optimizer}, scheduler: {scheduler}, learning rates: {lr1}, {lr2}")
-            
-
         else:
             optimizer = optim.Adam(model.parameters(), lr=lr)
+            
         if model.model_name == "Swin":
             loss_fn = compute_loss_swin
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=255)
+            
         model.to(device)
         model.train_model(
             train_loader=train_loader,

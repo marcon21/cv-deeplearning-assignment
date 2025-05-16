@@ -6,6 +6,9 @@ from typing import Union
 from sklearn.metrics import f1_score
 import wandb
 from tqdm import tqdm
+import os
+import numpy as np
+from torch.utils.data import Subset, DataLoader
 
 
 
@@ -135,6 +138,24 @@ class ModelBase(nn.Module):
         plt.legend()
         plt.show()
 
+    def get_subset_loader(self, data_loader, subset_size):
+        """
+        Returns a DataLoader for a random subset of the given data_loader's dataset.
+        """
+        dataset = data_loader.dataset
+        total_size = len(dataset)
+        indices = np.random.choice(
+            total_size, min(subset_size, total_size), replace=False
+        )
+        # Try to preserve collate_fn and num_workers if available
+        return DataLoader(
+            Subset(dataset, indices),
+            batch_size=data_loader.batch_size,
+            shuffle=False,
+            num_workers=getattr(data_loader, "num_workers", 0),
+            collate_fn=getattr(data_loader, "collate_fn", None),
+        )
+
     def train_model(
         self,
         train_loader,  # DataLoader for training data
@@ -200,6 +221,9 @@ class ModelBase(nn.Module):
                 wandb.log({f"{self.model_name}/train_loss": avg_loss, "epoch": epoch})
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}", end="")
 
+            # Validation logic: subset every epoch, full every 5 epochs
+            subset_size = 100  # You can adjust this value
+            validate_every = 5
             if test_loader is not None:
                 test_loss, test_accuracy, f1, miou = self.evaluate_model(test_loader, loss_fn)
                 if self.use_wandb:
@@ -214,23 +238,23 @@ class ModelBase(nn.Module):
                     )
                 self.test_history.append(test_loss)
                 print(f" | Test Loss: {test_loss:.4f}", end="")
+            
             # save model every epoch
             if self.file_path is not None:
                 self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
 
-            # Save model every epoch
-            try:
-                self.save(os.path.join(self.file_path, f"{self.model_name}_epoch_{epoch}.pth"))
-            except Exception as e:
-                print(f"Error saving model: {e}")
-                # Attempt to save to a fallback location
-                fallback_path = os.path.join(self.file_path, f"fallback_{self.model_name}_epoch_{epoch}.pth")
-                try:
-                    self.save(fallback_path)
-                    print(f"Model saved to fallback location: {fallback_path}")
-                except Exception as e:
-                    print(f"Error saving model to fallback location: {e}")
-            print()
+                
+            FREQUENCY_SAVE = 10
+            # Save model every 10 epochs
+            if (epoch + 1) % FREQUENCY_SAVE == 0:
+                save_path = self.file_path
+                if save_path is None:
+                    save_path = f"{self.model_name.lower()}_epoch{epoch+1}.pth"
+                else:
+                    # Insert epoch number before file extension
+                    base, ext = os.path.splitext(save_path)
+                    save_path = f"{base}_epoch{epoch+1}{ext}"
+                self.save(save_path)
 
         if eval_loader is not None:
             eval_loss, eval_accuracy, f1, miou = self.evaluate_model(eval_loader, loss_fn)

@@ -33,7 +33,7 @@ def load_data(
     batch_size=32,
     num_workers=4,
     grayscale=False,
-    resize=(256, 256),
+    size=(256, 256),
     transform=None,
 ):
     # Ensure the ratios sum to 1
@@ -47,7 +47,7 @@ def load_data(
     # Enhanced transforms with normalization
     transform = transforms.Compose(
         [
-            transforms.Resize(resize),
+            transforms.Resize(size),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -62,9 +62,7 @@ def load_data(
 
     target_transform = transforms.Compose(
         [
-            transforms.Resize(
-                resize, interpolation=transforms.InterpolationMode.NEAREST
-            ),
+            transforms.Resize(size, interpolation=transforms.InterpolationMode.NEAREST),
             transforms.PILToTensor(),
         ]
     )
@@ -130,3 +128,7 @@ if __name__ == "__main__":
         print(f"Images shape: {images.shape}, Masks shape: {masks.shape}")
 
         break
+
+    print(f"Train set size: {len(train_loader.dataset)}")
+    print(f"Test set size: {len(test_loader.dataset)}")
+    print(f"Eval set size: {len(eval_loader.dataset)}")

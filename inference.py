@@ -3,10 +3,7 @@ import torch
 import data
 from PIL import Image
 import numpy as np
-
-# Dynamically import model class
-import importlib
-from models.swin import SwinTransformer
+from tqdm import tqdm
 
 
 def get_model_class(class_name):
@@ -20,7 +17,8 @@ def get_model_class(class_name):
         return EfficientNet
 
     elif class_name == "Swin":
-        # from models.swin import SwinTransformer as SwinTransformer
+        from models.swin import SwinTransformer
+
         return SwinTransformer
     else:
         raise ValueError(f"Unknown model class: {class_name}")
@@ -31,67 +29,67 @@ def get_voc_palette(num_classes=21):
     palette = [
         0,
         0,
-        0,  # 0=background
-        128,
-        0,
-        0,  # 1=aeroplane
         0,
         128,
-        0,  # 2=bicycle
-        128,
-        128,
-        0,  # 3=bird
         0,
         0,
-        128,  # 4=boat
-        128,
-        0,
-        128,  # 5=bottle
         0,
         128,
-        128,  # 6=bus
+        0,
         128,
         128,
-        128,  # 7=car
+        0,
+        0,
+        0,
+        128,
+        128,
+        0,
+        128,
+        0,
+        128,
+        128,
+        128,
+        128,
+        128,
         64,
         0,
-        0,  # 8=cat
+        0,
         192,
         0,
-        0,  # 9=chair
-        64,
-        128,
-        0,  # 10=cow
-        192,
-        128,
-        0,  # 11=diningtable
-        64,
-        0,
-        128,  # 12=dog
-        192,
-        0,
-        128,  # 13=horse
-        64,
-        128,
-        128,  # 14=motorbike
-        192,
-        128,
-        128,  # 15=person
         0,
         64,
-        0,  # 16=potted plant
         128,
-        64,
-        0,  # 17=sheep
         0,
         192,
-        0,  # 18=sofa
         128,
-        192,
-        0,  # 19=train
         0,
         64,
-        128,  # 20=tv/monitor
+        0,
+        128,
+        192,
+        0,
+        128,
+        64,
+        128,
+        128,
+        192,
+        128,
+        128,
+        0,
+        64,
+        0,
+        128,
+        64,
+        0,
+        0,
+        192,
+        0,
+        128,
+        192,
+        0,
+        0,
+        64,
+        128,
     ]
     # Pad palette to 256*3
     palette += [0] * (256 * 3 - len(palette))
@@ -205,8 +203,14 @@ def main():
     parser.add_argument(
         "--num_examples",
         type=int,
-        default=5,
-        help="Number of examples to run inference on",
+        default=None,
+        help="Number of examples to run inference on (default: 5 for validation set, all for input_folder if not specified)",
+    )
+    parser.add_argument(
+        "--input_folder",
+        type=str,
+        help="Path to a folder of images to run inference on (optional)",
+        default=None,
     )
     args = parser.parse_args()
 
@@ -216,15 +220,39 @@ def main():
         else "mps" if torch.backends.mps.is_available() else "cpu"
     )
 
-    # Load data (use test set)
-    _, test_loader, _ = data.load_data(batch_size=1, size=(256, 256))
+    # Helper for preprocessing single images
+    from torchvision import transforms
+
+    preprocess = transforms.Compose(
+        [
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
+    # If input_folder is provided, use images from there
+    if args.input_folder is not None:
+        image_paths = [
+            os.path.join(args.input_folder, fname)
+            for fname in os.listdir(args.input_folder)
+            if fname.lower().endswith((".jpg", ".jpeg", ".png", ".bmp"))
+        ]
+        image_paths = sorted(image_paths)
+        if args.num_examples is not None:
+            image_paths = image_paths[: args.num_examples]
+        eval_loader = None  # Not used
+    else:
+        # Load data (use validation set)
+        num_examples = args.num_examples if args.num_examples is not None else 5
+        _, _, eval_loader = data.load_data(batch_size=1, size=(256, 256))
 
     # Dynamically get model class
     for model_name, index in zip(args.model_class, range(len(args.model_class))):
         if model_name not in ["UNet", "EfficientNet", "Swin"]:
             raise ValueError(f"Unknown model class: {model_name}")
         ModelClass = get_model_class(model_name)
-        model_instance = None  # Initialize model_instance
+        model_instance = None
         if model_name == "UNet":
             model_instance = ModelClass(
                 input_channels=3,
@@ -234,13 +262,13 @@ def main():
                 file_path=None,
             )
         elif model_name == "EfficientNet":
-            model = ModelClass(
+            model_instance = ModelClass(
                 num_classes=21,
                 file_path=None,
                 device=device,
+                use_wandb=False,
             )
         elif model_name == "Swin":
-            # Example: Model2(num_classes, decoder, model_name, ...)
             model_instance = ModelClass(
                 num_classes=21,
                 decoder="aspp",
@@ -249,6 +277,7 @@ def main():
                 device=device,
                 use_wandb=False,
             )
+
         model_instance.load(args.model_paths[index])
         model_instance.to(device)
         model_instance.eval()
@@ -259,27 +288,58 @@ def main():
         os.makedirs(out_dir, exist_ok=True)
 
         count = 0
-        for images, masks in test_loader:
-            if count >= args.num_examples:
-                break
-            images = images.to(device)
-            with torch.no_grad():
-                outputs = model_instance(images)
-                preds = torch.argmax(outputs, dim=1)
+        if args.input_folder is not None:
+            image_iter = tqdm(
+                image_paths,
+                total=len(image_paths),
+                desc=f"{model_name} inference (folder)",
+                leave=True,
+            )
+            for img_path in image_iter:
+                if args.num_examples is not None and count >= args.num_examples:
+                    break
+                img = Image.open(img_path).convert("RGB")
+                input_tensor = preprocess(img).unsqueeze(0).to(device)
+                with torch.no_grad():
+                    outputs = model_instance(input_tensor)
+                    preds = torch.argmax(outputs, dim=1)
+                input_pil = tensor_to_pil(input_tensor[0])
+                pred_pil = tensor_to_pil(preds[0], is_mask=True)
+                concat_path = os.path.join(out_dir, f"{count}_concat.png")
+                # Only input and prediction (no GT mask)
+                concat_and_save_images_from_pil(
+                    input_pil, pred_pil, pred_pil, concat_path
+                )
+                count += 1
+                image_iter.set_postfix({"Saved": count})
+            print(f"Saved {count} examples for {model_name} to {out_dir}")
+        else:
+            image_iter = tqdm(
+                eval_loader,
+                total=num_examples,
+                desc=f"{model_name} inference",
+                leave=True,
+            )
+            for images, masks in image_iter:
+                if count >= num_examples:
+                    break
+                images = images.to(device)
+                with torch.no_grad():
+                    outputs = model_instance(images)
+                    preds = torch.argmax(outputs, dim=1)
 
-            # Create paths for intermediate images, but don't save them individually
-            # These paths are needed for concat_and_save_images if it reads from disk
-            # If concat_and_save_images can take tensors/PIL Images, this can be further optimized
-            input_pil = tensor_to_pil(images[0])
-            gt_pil = tensor_to_pil(masks[0], is_mask=True)
-            pred_pil = tensor_to_pil(preds[0], is_mask=True)
+                input_pil = tensor_to_pil(images[0])
+                gt_pil = tensor_to_pil(masks[0], is_mask=True)
+                pred_pil = tensor_to_pil(preds[0], is_mask=True)
 
-            concat_path = os.path.join(out_dir, f"{count}_concat.png")
-            # Modify concat_and_save_images to accept PIL Images directly
-            concat_and_save_images_from_pil(input_pil, gt_pil, pred_pil, concat_path)
+                concat_path = os.path.join(out_dir, f"{count}_concat.png")
+                concat_and_save_images_from_pil(
+                    input_pil, gt_pil, pred_pil, concat_path
+                )
 
-            count += 1
-        print(f"Saved {count} examples for {model_name} to {out_dir}")
+                count += 1
+                image_iter.set_postfix({"Saved": count})
+            print(f"Saved {count} examples for {model_name} to {out_dir}")
 
 
 if __name__ == "__main__":

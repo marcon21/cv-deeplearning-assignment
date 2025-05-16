@@ -1,91 +1,136 @@
 # cv-deeplearning-assignment
 
-### Inference and Visualization
+## Overview
 
-The `inference.py` script not only performs inference on test examples but also provides additional visualization options.
-
-**Key Features:**
-
-- Loads test data using `data.load_data`.
-- Dynamically imports model classes (e.g., `UNet`, `EfficientNet`, `Swin`) based on the `--model_class` argument.
-- Loads pre-trained model weights specified by `--model_paths`.
-- Runs inference on a specified number of test images.
-- Outputs for each example:
-  - Original input image (after normalization).
-  - Ground truth mask (with a Pascal VOC color palette for clarity).
-  - The prediction mask (using the same palette).
-  - A concatenated image that joins the input, ground truth, and prediction images side-by-side.
-  - An overlapped image where:
-    - Ground truth areas are blended in red.
-    - Predicted regions are blended in green.
-
-### Command-Line Arguments for `inference.py`
-
-- `--model_class` (required): One or more model class names (e.g., `UNet EfficientNet Swin`).
-- `--model_paths` (required): Corresponding file paths for the model weights for each class specified. Must be in the same order as `--model_class`.
-- `--num_examples` : Number of examples on which to run inference (default: 5).
-
-The device for inference (CUDA, MPS, CPU) is selected automatically. For `SwinTransformer`, specific configurations (e.g., backbone size, decoder type) are currently defined within `inference.py` during model instantiation and are not set via command-line arguments in this script.
-
-### Example Usage for `inference.py`
-
-To run inference using a pre-trained `Swin` model and a `UNet` model, on 10 examples:
-
-```bash
-python inference.py --model_class Swin UNet --model_paths ./model_saves/swin_model.pth ./model_saves/unet_model.pth --num_examples 10
-```
-
-You can also include `EfficientNet` if you have a trained model for it.
-
-The generated images are saved in the `out/examples/<model_name>/` directory for each model.
-
-### Function Overview (`inference.py`)
-
-- `get_model_class(class_name)`: Dynamically imports and returns the requested model class.
-- `get_voc_palette(num_classes=21)`: Returns the Pascal VOC color palette adjusted to 256×3 entries.
-- `save_image(tensor, path, is_mask=False)`: Saves a tensor as an image; applies appropriate scaling and palette for masks.
-- `concat_and_save_images(...)`: Concatenates the input image, ground truth, and prediction for easy comparison.
-- `save_overlapped_images(...)`: Overlays ground truth (red) and prediction (green) on the input image using blending.
+This repository provides scripts for training and evaluating deep learning models for semantic segmentation on the Pascal VOC dataset. You can train models like UNet, EfficientNet, and Swin Transformer, and run inference to visualize predictions.
 
 ---
 
-### Training Models
+## 1. Training Models (`train.py`)
 
-The `train.py` script supports training multiple models, including `UNet`, `EfficientNet`, and `SwinTransformer`. It allows customization of training parameters.
+The `train.py` script allows you to train one or more segmentation models with customizable settings.
 
-### Command-Line Arguments for `train.py`
-
-- `--models` (required): List of model class names to train (e.g., `UNet Swin EfficientNet`).
-- `--epochs`: List of training epochs for each model (default: `[10]`). If one value is provided, it's used for all models.
-- `--batch_sizes`: List of batch sizes for each model (default: `[4]`). If one value is provided, it's used for all models.
-- `--device`: Device to use (`auto`, `cpu`, `cuda`, `mps`; default: `auto`).
-- `--load_weights`: List of paths to model weights to load before training (in order of models specified in `--models`). Use 'None' or skip for models without pre-trained weights.
-- `--workers`: Number of workers for data loading (default: `0`).
-- `--learning_rates`: List of learning rates (default: `[6e-5, 6e-4]`).
-  - If training `Swin` or `EfficientNet`: The first two values from this list are used as `[backbone_lr, decoder_lr]`.
-  - If training other models (e.g., `UNet`): The first value in this list (`learning_rates[0]`) is used as its learning rate.
-  - **Caution**: If training multiple models simultaneously (e.g., `Swin` and `UNet`), be aware that `Swin`/`EfficientNet` (for their backbone LR) and `UNet` will all attempt to use `learning_rates[0]`. The script does not currently consume LRs sequentially for different model types from this list. Plan your learning rate list and model order accordingly.
-- `--weight_decays`: List of weight decay values (default: `[1e-4, 5e-4]`).
-  - If training `Swin` or `EfficientNet`: The first two values from this list are used as `[backbone_wd, decoder_wd]`.
-  - For other models (e.g., `UNet`): This argument is _not_ used by `train.py` to set weight decay; their optimizers (e.g., Adam) will use their own default weight decay (typically 0 for Adam).
-  - **Caution**: Similar to learning rates, `Swin`/`EfficientNet` will use `weight_decays[0]` and `weight_decays[1]`.
-
-**Swin Transformer and EfficientNet Related Arguments (used if "Swin" or "EfficientNet" is in `--models`):**
-
-- `--backbone`: Backbone model size.
-  - For `SwinTransformer` (`tiny`, `base`, `small`; default: `tiny`), this defines the architecture.
-  - For `EfficientNet`, this argument is used by `train.py` to construct the filename for saving/loading weights (e.g., `efficientnet_tiny.pth`) but does not alter the `EfficientNet` architecture itself (which is typically a fixed variant like B0, B1, etc., defined within the model code).
-- `--decoder`: Decoder type for `SwinTransformer` (`simple`, `deeplab`, `aspp`; default: `simple`). This argument is not used by `EfficientNet`.
-
-### Example Usage for `train.py`
-
-To train a `SwinTransformer` model with a `tiny` backbone and `aspp` decoder for 20 epochs with batch size 8, and a `UNet` model for 15 epochs with batch size 16:
+### Usage
 
 ```bash
-python train.py --models Swin UNet --epochs 20 15 --batch_sizes 8 16 --backbone tiny --decoder aspp --learning_rates 5e-5 5e-4 1e-3 --weight_decays 1e-4 1e-4 0
+python train.py --models <MODEL_NAMES> [options]
 ```
 
-In this example:
+### Required Arguments
 
-- `Swin` uses backbone LR `5e-5` (from `learning_rates[0]`), decoder LR `5e-4` (from `learning_rates[1]`). It uses backbone WD `1e-4` (from `weight_decays[0]`) and decoder WD `1e-4` (from `weight_decays[1]`).
-- `UNet` uses LR `5e-5` (from `learning_rates[0]`, due to current script logic). The third learning rate `1e-3` is not automatically assigned to `UNet` in this mixed setup. The weight decay for `UNet` is determined by its Adam optimizer's default (0), as the `0` in `--weight_decays ... 0` is not passed to the `UNet` optimizer by `train.py`.
+- `--models`: List of model class names to train. Supported: `UNet`, `EfficientNet`, `Swin`.
+
+### Common Options
+
+- `--epochs`: List of epochs for each model (default: `[10]`).
+- `--batch_sizes`: List of batch sizes for each model (default: `[4]`).
+- `--device`: Device to use (`auto`, `cpu`, `cuda`, `mps`; default: `auto`).
+- `--learning_rates`: Learning rates. For `Swin`/`EfficientNet`, provide two values: `[backbone_lr, decoder_lr]`. For others, only the first value is used.
+- `--weight_decays`: Weight decay values. For `Swin`/`EfficientNet`, provide two values: `[backbone_wd, decoder_wd]`.
+- `--backbone`: (For Swin) Backbone size: `tiny`, `base`, or `small` (default: `tiny`).
+- `--decoder`: (For Swin) Decoder type: `simple`, `deeplab`, or `aspp` (default: `simple`).
+- `--load_weights`: (Optional) List of paths to pre-trained weights for each model.
+- `--workers`: Number of data loader workers (default: `0`).
+
+### Example: Train Swin and UNet
+
+```bash
+python train.py --models Swin UNet --epochs 20 15 --batch_sizes 8 16 \
+  --backbone tiny --decoder aspp \
+  --learning_rates 5e-5 5e-4 1e-3 --weight_decays 1e-4 1e-4 0
+```
+
+- This trains a Swin Transformer (tiny, aspp decoder) for 20 epochs (batch 8) and a UNet for 15 epochs (batch 16).
+- The first two learning rates/weight decays are used for Swin; the first is used for UNet.
+
+**Note:**
+
+- The order of arguments matters. The number of epochs, batch sizes, and weights should match the number of models (or provide a single value to use for all).
+- For `Swin` and `EfficientNet`, always provide two learning rates and two weight decays.
+
+---
+
+## 2. Inference and Visualization (`inference.py`)
+
+The `inference.py` script runs inference using trained models and visualizes the results. It can process images from the validation set or a custom folder.
+
+### Usage
+
+```bash
+python inference.py --model_class <MODEL_NAMES> --model_paths <WEIGHT_PATHS> [options]
+```
+
+### Required Arguments
+
+- `--model_class`: One or more model class names (e.g., `UNet EfficientNet Swin`).
+- `--model_paths`: Corresponding paths to model weights (same order as `--model_class`).
+
+### Options
+
+- `--num_examples`: Number of examples to run inference on.
+  - **If using `--input_folder` and not specified, all images in the folder will be processed.**
+  - **If not using `--input_folder`, defaults to 5.**
+- `--input_folder`: (Optional) Path to a folder of images to run inference on. If not provided, uses the validation set.
+
+### Example: Inference with Swin and UNet
+
+```bash
+python inference.py --model_class Swin UNet \
+  --model_paths ./model_saves/swin_model.pth ./model_saves/unet_model.pth \
+  --num_examples 10
+```
+
+- This runs inference on 10 validation images using both models.
+
+### Example: Inference on Custom Images
+
+```bash
+python inference.py --model_class UNet \
+  --model_paths ./model_saves/unet_model.pth \
+  --input_folder ./my_images
+```
+
+- This runs inference on **all images** from `./my_images` using UNet (unless you specify `--num_examples`).
+
+### Output
+
+- Results are saved in `out/examples/<model_name>/` for each model.
+- For each example, you get:
+  - The input image
+  - (If available) Ground truth mask
+  - The predicted mask
+  - A concatenated image (input | ground truth | prediction)
+  - An overlapped image (input with ground truth in red, prediction in green)
+
+### Notes
+
+- The order of `--model_class` and `--model_paths` must match.
+- Device is selected automatically (CUDA, MPS, or CPU).
+- For Swin, backbone/decoder are set in the script (not via command-line).
+- **If you use `--input_folder` and do not specify `--num_examples`, all images in the folder will be processed.**
+- **If you do not use `--input_folder`, the default is 5 examples unless you specify otherwise.**
+
+---
+
+## Troubleshooting
+
+- If you get errors about argument counts, check that the number of models, weights, epochs, and batch sizes match or are set to a single value.
+- Make sure your model weights exist and are compatible with the model class.
+- For custom images, ensure they are in a supported format (`.jpg`, `.jpeg`, `.png`, `.bmp`).
+
+---
+
+## Quick Start
+
+1. **Train a model:**
+   ```bash
+   python train.py --models UNet --epochs 10 --batch_sizes 4
+   ```
+2. **Run inference:**
+   ```bash
+   python inference.py --model_class UNet --model_paths ./model_saves/unet_model.pth --num_examples 5
+   ```
+
+---
+
+For more details, see the code and comments in `train.py` and `inference.py`.

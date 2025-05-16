@@ -6,12 +6,12 @@ from torch import nn
 class UNet(ModelBase):
     def __init__(
         self,
-        input_channels,  # Changed from input_dim
-        output_channels,  # Changed from output_dim
+        input_channels,
+        output_channels,
         file_path: str = "./model_saves/unet.pth",
         device=None,
         use_wandb: bool = True,
-        dropout_rate: float = 0.3,  # Added dropout_rate
+        dropout_rate: float = 0.3,
     ):
         """
         Initializes the U-Net model.
@@ -41,21 +41,13 @@ class UNet(ModelBase):
 
         # Decoder (Upsampling path)
         self.upconv4 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
-        self.dec_conv4 = self.double_conv(
-            1024, 512, use_dropout=False
-        )  # 512 (from upconv) + 512 (from enc_conv4)
+        self.dec_conv4 = self.double_conv(1024, 512, use_dropout=False)
         self.upconv3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.dec_conv3 = self.double_conv(
-            512, 256, use_dropout=False
-        )  # 256 (from upconv) + 256 (from enc_conv3)
+        self.dec_conv3 = self.double_conv(512, 256, use_dropout=False)
         self.upconv2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.dec_conv2 = self.double_conv(
-            256, 128, use_dropout=False
-        )  # 128 (from upconv) + 128 (from enc_conv2)
+        self.dec_conv2 = self.double_conv(256, 128, use_dropout=False)
         self.upconv1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.dec_conv1 = self.double_conv(
-            128, 64, use_dropout=False
-        )  # 64 (from upconv) + 64 (from enc_conv1)
+        self.dec_conv1 = self.double_conv(128, 64, use_dropout=False)
 
         # Output layer
         self.out_conv = nn.Conv2d(64, output_channels, kernel_size=1)

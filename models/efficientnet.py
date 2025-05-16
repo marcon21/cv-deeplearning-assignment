@@ -45,8 +45,9 @@ class EfficientNet(ModelBase):
         num_classes=21,
         file_path: str = "./model_saves/efficientnet.pth",
         device=None,
+        use_wandb=False,
     ):
-        super().__init__(file_path=file_path, device=device)
+        super().__init__(file_path=file_path, device=device, use_wandb=use_wandb)
         backbone = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
         self.backbone = backbone.features.to(self.device)
         self.output_dim = 1280
@@ -56,8 +57,8 @@ class EfficientNet(ModelBase):
 
     def forward(self, x):
         input_size = x.shape[-2:]
-        x = self.backbone(x)  # [B, 1280, H/32, W/32]
-        x = self.decoder(x)  # [B, num_classes, H/2, W/2] or more
+        x = self.backbone(x)
+        x = self.decoder(x)
         x = F.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
         return x
 
